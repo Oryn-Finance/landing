@@ -185,15 +185,12 @@ export const AssetDropdown: React.FC<{
                         {/* Asset logo and symbol */}
                         <div className="flex items-center gap-2 pr-3 border-gray-200 min-w-0">
                           {getAssetLogo(asset.asset.symbol)}
-                          <span className="font-semibold text-gray-900 text-base leading-tight truncate">
-                            {asset.asset.symbol}
-                          </span>
                         </div>
                         {/* Chain logo and name */}
-                        <div className="flex items-center gap-1 min-w-0 ml-4">
+                        <div className="flex items-center gap-1 min-w-0 -ml-4.5">
                           {getChainLogo(asset.chainName)}
-                          <span className="text-xs text-gray-500 font-medium ml-1 truncate">
-                            {asset.chainName}
+                          <span className="font-semibold text-gray-900 text-base leading-tight truncate">
+                            {asset.asset.symbol}
                           </span>
                         </div>
                         {/* Selected checkmark */}

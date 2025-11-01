@@ -68,7 +68,7 @@ const Swap: React.FC<SwapProps> = () => {
                 }
                 onSelect={(asset) => handleAssetSelect(asset, "from")}
               />
-              <div className="relative w-full">
+              <div className="relative w-1/2">
                 <input
                   inputMode="decimal"
                   pattern="[0-9]*[.,]?[0-9]*"
@@ -131,7 +131,7 @@ const Swap: React.FC<SwapProps> = () => {
                 }
                 onSelect={(asset) => handleAssetSelect(asset, "to")}
               />
-              <div className="relative w-full">
+              <div className="relative w-1/2">
                 <input
                   type="number"
                   placeholder="0.0"

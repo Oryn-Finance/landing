@@ -19,6 +19,6 @@ export const SUPPORTED_CHAINS = {
 export const network = "testnet";
 
 export const API_URLS = {
-  QUOTE: "https://bck8kwssk4swg08ogwk08wo0.116.202.246.116.sslip.io/",
+  QUOTE: "http://bck8kwssk4swg08ogwk08wo0.116.202.246.116.sslip.io",
   ORDERBOOK: "http://localhost:4455",
 } as const;

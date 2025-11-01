@@ -111,10 +111,10 @@ export const useAssetsStore = create<AssetsState>()(
       fetchAssets: async () => {
         try {
           set({ isLoading: true, error: null });
-          const response = await axios.get(
-            `${API_URLS.QUOTE}/supported-assets`
-          );
+          const response = await axios.get(`${API_URLS.QUOTE}/chains`);
           const chains: Chain[] = response.data.result;
+
+          console.log(chains);
 
           const flatOptions: AssetOption[] = [];
           chains.forEach((chain) => {
