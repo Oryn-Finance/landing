@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAssetsStore, type AssetOption } from "../store/assetsStore";
 import Image from "next/image";
 
-// Asset and chain logo URLs
 const ASSET_LOGOS: Record<string, string> = {
   wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
   avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
@@ -15,22 +14,17 @@ const ASSET_LOGOS: Record<string, string> = {
 };
 
 const CHAIN_LOGOS: Record<string, string> = {
-  "Arbitrum Sepolia":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
-  "Avalanche Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  "Bitcoin Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  "Starknet Sepolia":
-    "	https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-  Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  "Arbitrum Sepolia": "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
+  "Avalanche Testnet": "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  "Bitcoin Testnet": "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  "Starknet Sepolia": "	https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  "Avalanche": "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  "Bitcoin": "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  "Starknet": "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
 };
 
 function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
   const key = symbol.toLowerCase();
-  console.log(key);
   let url: string | undefined;
   if (key === "btc" || key === "bitcoin") url = ASSET_LOGOS.bitcoin;
   else if (key === "usdc") url = ASSET_LOGOS.usdc;
@@ -56,9 +50,7 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
     );
   }
   return (
-    <div
-      className={`${sizeClasses[size]} bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium`}
-    >
+    <div className={`${sizeClasses[size]} bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium`}>
       {symbol.charAt(0)}
     </div>
   );
@@ -82,9 +74,7 @@ function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
     );
   }
   return (
-    <div
-      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-medium text-gray-500 border-2 border-white`}
-    >
+    <div className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-medium text-gray-500 border-2 border-white`}>
       {chainName.charAt(0)}
     </div>
   );
@@ -142,9 +132,8 @@ export const AssetDropdown: React.FC<{
           )}
         </div>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+            }`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -197,10 +186,9 @@ export const AssetDropdown: React.FC<{
                       key={asset.value}
                       onClick={() => onSelect(asset)}
                       className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-150 group
-                        ${
-                          isSelected
-                            ? "bg-[#e84142]/5 border-2 border-[#e84142]/70 shadow"
-                            : "hover:bg-gray-50 border border-transparent"
+                        ${isSelected
+                          ? "bg-[#e84142]/5 border-2 border-[#e84142]/70 shadow"
+                          : "hover:bg-gray-50 border border-transparent"
                         } focus:outline-none`}
                     >
                       <div className="flex items-center w-full gap-3">

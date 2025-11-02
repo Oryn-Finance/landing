@@ -286,10 +286,7 @@ const Swap: React.FC<SwapProps> = () => {
           height={200}
           width={576}
         />
-      </div>
-
-      {/* Bridge Button */}
-      <SlideToConfirmButton
+        <SlideToConfirmButton
         disabled={
           !fromAsset ||
           !toAsset ||
@@ -319,6 +316,7 @@ const Swap: React.FC<SwapProps> = () => {
           // TODO: Implement actual swap logic
         }}
       />
+      </div>
     </div>
   );
 };
