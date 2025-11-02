@@ -223,9 +223,10 @@ export const AssetDropdown: React.FC<{
                       key={asset.value}
                       onClick={() => onSelect(asset)}
                       className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-150 group
-                        ${isSelected
-                          ? "bg-[#e84142]/5 border-2 border-[#e84142]/70 shadow"
-                          : "hover:bg-gray-50 border border-transparent"
+                        ${
+                          isSelected
+                            ? "bg-[#e84142]/5 border-2 border-[#e84142]/70 shadow"
+                            : "hover:bg-gray-50 border border-transparent"
                         } focus:outline-none`}
                     >
                       <div className="flex items-center w-full gap-3">
