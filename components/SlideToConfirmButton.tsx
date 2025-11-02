@@ -25,12 +25,21 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
 
-  const containerWidth = 300; // Fixed width for the slide container
-  const thumbSize = 60; // Size of the draggable circle
-  const maxDrag = containerWidth - thumbSize - 8; // Maximum drag distance
+  const [containerWidth, setContainerWidth] = useState(300);
+  const thumbSize = 48; // w-12 = 48px
+  const thumbPadding = 8; // left-2 = 8px
+  const maxDrag = containerWidth - thumbSize - (thumbPadding * 2); // Maximum drag distance
 
   const opacity = useTransform(x, [0, maxDrag], [0.3, 1]);
   const scale = useTransform(x, [0, maxDrag], [0.8, 1]);
+
+  useEffect(() => {
+    // Calculate actual container width
+    if (containerRef.current) {
+      const width = containerRef.current.offsetWidth;
+      setContainerWidth(width);
+    }
+  }, []);
 
   useEffect(() => {
     if (isConfirmed) {
@@ -69,12 +78,28 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
     }
   };
 
-  const progressWidth = useTransform(x, [0, maxDrag], ["0%", "100%"]);
+  // Progress width should match the slider position exactly
+  // Thumb left edge is at: thumbPadding (8px) + x
+  // Fill should extend to the right edge of the thumb: thumbPadding + x + thumbSize
+  const progressWidthPx = useTransform(
+    x,
+    [0, maxDrag],
+    [
+      thumbPadding + thumbSize, // When x=0, fill extends to right edge of initial thumb position
+      thumbPadding + maxDrag + thumbSize, // When x=maxDrag, fill extends to right edge of final thumb position
+    ],
+    {
+      clamp: false,
+    }
+  );
+
+  // Convert to pixels as a string
+  const progressWidthString = useTransform(progressWidthPx, (w) => `${w}px`);
 
   if (isLoading) {
     return (
       <div
-        className={`relative w-full h-16 bg-gray-900 rounded-2xl flex items-center justify-center ${className}`}
+        className={`relative w-full h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center ${className}`}
       >
         <div className="flex items-center justify-center text-white">
           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
@@ -87,21 +112,28 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative w-[95%] h-16 bg-gray-900 rounded-full overflow-hidden ${
-        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-      } ${className}`}
+      className={`relative w-[95%] h-16 bg-gray-200 rounded-full overflow-hidden ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+        } ${className}`}
     >
+      {/* Filled progress background - purple-blue gradient on left side */}
+      <motion.div
+        style={{
+          width: progressWidthString,
+        }}
+        className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full"
+      />
+
       {/* Background with arrow */}
-      <div className="absolute inset-0 flex items-center justify-end pr-4">
+      <div className="absolute inset-0 flex items-center justify-end pr-4 z-10">
         <motion.div
           style={{ opacity }}
-          className="text-white text-sm font-medium"
+          className="text-gray-700 text-sm font-medium"
         >
           {confirmText}
         </motion.div>
         <motion.svg
           style={{ opacity, scale }}
-          className="w-6 h-6 text-white ml-2"
+          className="w-6 h-6 text-gray-700 ml-2"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -115,7 +147,7 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
         </motion.svg>
       </div>
 
-      {/* Draggable thumb */}
+      {/* Draggable thumb - always visible */}
       <motion.div
         drag={disabled ? false : "x"}
         dragConstraints={{ left: 0, right: maxDrag }}
@@ -123,14 +155,13 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         style={{ x }}
-        className={`absolute top-2 left-2 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing ${
-          isDragging ? "shadow-xl" : ""
-        }`}
+        className={`absolute top-2 left-2 w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing z-20 ${isDragging ? "shadow-xl" : ""
+          }`}
         whileDrag={{ scale: 1.1 }}
       >
         {/* Arrow icon in the thumb */}
         <svg
-          className="w-5 h-5 text-gray-600"
+          className="w-5 h-5 text-white"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -143,14 +174,6 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
           />
         </svg>
       </motion.div>
-
-      {/* Progress background */}
-      <motion.div
-        style={{
-          width: progressWidth,
-        }}
-        className="absolute inset-0 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl"
-      />
     </div>
   );
 };
