@@ -23,6 +23,7 @@ import {
   Globe2,
 } from "lucide-react";
 import Swap from "../components/Swap";
+import Link from "next/link";
 
 function FloatingParticles() {
   const [particleData, setParticleData] = useState<
@@ -307,8 +308,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <motion.div
-              className="flex items-center gap-2 text-2xl font-bold"
-              whileHover={{ scale: 1.05 }}
+              className="flex items-center gap-2 text-2xl font-bold cursor-pointer"
             >
               <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
                 <Bitcoin className="w-6 h-6 text-white" />
@@ -325,16 +325,18 @@ export default function Home() {
               >
                 Source Code
               </motion.button>
-              <motion.button
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold shadow-lg"
-                whileHover={{
-                  scale: 1.05,
-                  boxShadow: "0 0 25px rgba(147, 51, 234, 0.4)",
-                }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Launch App
-              </motion.button>
+              <Link href="/swap">
+                <motion.button
+                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold shadow-lg cursor-pointer"
+                  whileHover={{
+                    scale: 1.05,
+                    boxShadow: "0 0 25px rgba(147, 51, 234, 0.4)",
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Launch App
+                </motion.button>
+              </Link>
             </div>
           </div>
         </div>
@@ -403,24 +405,26 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.6 }}
               >
+                <Link href="/swap">
+                  <motion.button
+                    className="group relative px-8 py-3.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-base font-medium rounded-lg flex items-center justify-center gap-2 overflow-hidden cursor-pointer"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      Start Swapping
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                    </span>
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-purple-700 to-blue-700"
+                      initial={{ opacity: 0 }}
+                      whileHover={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </motion.button>
+                </Link>
                 <motion.button
-                  className="group relative px-8 py-3.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-base font-medium rounded-lg flex items-center justify-center gap-2 overflow-hidden"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <span className="relative z-10 flex items-center gap-2">
-                    Start Swapping
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                  </span>
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-purple-700 to-blue-700"
-                    initial={{ opacity: 0 }}
-                    whileHover={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </motion.button>
-                <motion.button
-                  className="px-8 py-3.5 bg-white/60 backdrop-blur-sm border border-purple-200/60 text-gray-700 text-base font-medium rounded-lg hover:border-purple-300/80 hover:bg-white/80 transition-all"
+                  className="px-8 py-3.5 bg-white/60 backdrop-blur-sm border border-purple-200/60 text-gray-700 text-base font-medium rounded-lg hover:border-purple-300/80 hover:bg-white/80 transition-all cursor-pointer"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -431,7 +435,7 @@ export default function Home() {
 
             {/* Right Column - Swap Component */}
             <motion.div
-              className="relative w-full max-w-md"
+              className="relative w-full max-w-2xl"
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
@@ -1369,16 +1373,18 @@ export default function Home() {
                 Join thousands of users swapping assets in 30 seconds
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <motion.button
-                  className="px-8 py-3 bg-white text-purple-600 text-base font-medium rounded-lg"
-                  whileHover={{
-                    scale: 1.02,
-                    boxShadow: "0 4px 20px rgba(255, 255, 255, 0.3)",
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Launch Bridge App
-                </motion.button>
+                <Link href="/swap">
+                  <motion.button
+                    className="px-8 py-3 bg-white text-purple-600 text-base font-medium rounded-lg cursor-pointer"
+                    whileHover={{
+                      scale: 1.02,
+                      boxShadow: "0 4px 20px rgba(255, 255, 255, 0.3)",
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Launch Bridge App
+                  </motion.button>
+                </Link>
                 <motion.button
                   className="px-8 py-3 bg-transparent text-white text-base font-medium rounded-lg border border-white/60 hover:bg-white/10 transition-colors"
                   whileHover={{ scale: 1.02 }}
