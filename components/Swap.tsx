@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AssetDropdown } from "./AssetDropdown";
-import SlideToConfirmButton from "./SlideToConfirmButton";
 import { useAssetsStore } from "../store/assetsStore";
+import { useWalletStore } from "../store/walletStore";
 import Image from "next/image";
+import SlideToConfirmButton from "./SlideToConfirmButton";
 
 interface SwapProps {
   onOrderCreated?: (orderId: string) => void;
@@ -15,6 +16,7 @@ const Swap: React.FC<SwapProps> = () => {
   const {
     fromAsset,
     toAsset,
+    sendAmount,
     sendValue,
     receiveValue,
     receiveAmount,
@@ -24,21 +26,24 @@ const Swap: React.FC<SwapProps> = () => {
     fetchAssets,
     setFromAsset,
     setToAsset,
+    setSendAmount,
     swapAssets,
     setShowHero,
-    resetSwapState,
-    setsendValue,
+    createOrder,
   } = useAssetsStore();
+
+  const { evmWallet, btcWallet } = useWalletStore();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<"from" | "to" | null>(
     null
   );
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
   useEffect(() => {
-    resetSwapState();
     fetchAssets();
     setShowHero(true);
-  }, [fetchAssets, setShowHero, resetSwapState]);
+  }, [fetchAssets, setShowHero]);
 
   const handleAssetSelect = (asset: typeof fromAsset, type: "from" | "to") => {
     if (type === "from") {
@@ -47,6 +52,56 @@ const Swap: React.FC<SwapProps> = () => {
       setToAsset(asset);
     }
     setIsDropdownOpen(null);
+  };
+
+  // Helper function to determine if a chain is Bitcoin-based
+  const isBitcoinChain = (chainId: string, chainName: string): boolean => {
+    const identifier = `${chainId}${chainName}`.toLowerCase();
+    return identifier.includes("bitcoin") || identifier.includes("btc");
+  };
+
+  // Get wallet address for a given chain
+  const getWalletAddress = (asset: typeof fromAsset): string | null => {
+    if (!asset) return null;
+    const isBTC = isBitcoinChain(asset.chainId, asset.chainName);
+    if (isBTC) {
+      return btcWallet?.isConnected ? btcWallet.address : null;
+    } else {
+      return evmWallet?.isConnected ? evmWallet.address : null;
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!fromAsset || !toAsset || !sendAmount || !quote) {
+      setOrderError("Missing required swap data");
+      return;
+    }
+
+    const sourceAddress = getWalletAddress(fromAsset);
+    const destinationAddress = getWalletAddress(toAsset);
+
+    if (!sourceAddress) {
+      setOrderError(`Please connect your ${isBitcoinChain(fromAsset.chainId, fromAsset.chainName) ? "Bitcoin" : "EVM"} wallet for the source chain`);
+      return;
+    }
+
+    if (!destinationAddress) {
+      setOrderError(`Please connect your ${isBitcoinChain(toAsset.chainId, toAsset.chainName) ? "Bitcoin" : "EVM"} wallet for the destination chain`);
+      return;
+    }
+
+    try {
+      setIsCreatingOrder(true);
+      setOrderError(null);
+      const result = await createOrder(sourceAddress, destinationAddress);
+      console.log("Order created successfully:", result);
+      // You can handle success (e.g., show success message, redirect, etc.)
+    } catch (error) {
+      console.error("Failed to create order:", error);
+      setOrderError(error instanceof Error ? error.message : "Failed to create order");
+    } finally {
+      setIsCreatingOrder(false);
+    }
   };
 
   return (
@@ -82,12 +137,13 @@ const Swap: React.FC<SwapProps> = () => {
                     type="text"
                     inputMode="decimal"
                     pattern="[0-9]*[.,]?[0-9]*"
-                    placeholder={isQuoteLoading ? "" : "0.0"}
-                    value={sendValue}
+                    placeholder="0.0"
+                    value={sendAmount}
                     onChange={(e) => {
                       let value = e.target.value;
                       if (value === ".") {
-                        value = "0.";
+                        setSendAmount("0.");
+                        return;
                       }
                       value = value.replace(/[^0-9.]/g, "");
                       if (/^0+$/.test(value) && value.length > 1) {
@@ -100,15 +156,18 @@ const Swap: React.FC<SwapProps> = () => {
                       if (parts.length > 2) {
                         value = parts[0] + "." + parts.slice(1).join("");
                       }
-                      setsendValue(value);
+                      if (parts.length === 2 && parts[1].length > 6) {
+                        value = parts[0] + "." + parts[1].substring(0, 6);
+                      }
+                      setSendAmount(value);
                     }}
                     className="text-xl md:text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
                     disabled={!fromAsset}
                     autoComplete="off"
                   />
-                  {sendValue && !isQuoteLoading && (
+                  {sendValue && (
                     <span className="text-xs text-gray-500 font-medium">
-                      $
+                      ≈ $
                       {parseFloat(sendValue).toLocaleString(undefined, {
                         maximumFractionDigits: 2,
                       })}
@@ -164,13 +223,19 @@ const Swap: React.FC<SwapProps> = () => {
                 <div className="relative flex-1 flex flex-col items-end gap-1 min-w-0">
                   <input
                     type="decimal"
-                    placeholder={isQuoteLoading ? "" : "0.0"}
-                    value={isQuoteLoading ? "" : receiveAmount}
+                    placeholder="0.0"
+                    value={
+                      receiveAmount
+                        ? Number(receiveAmount)
+                          .toFixed(6)
+                          .replace(/\.?0+$/, "") || "0"
+                        : ""
+                    }
                     readOnly
                     className="text-xl md:text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
                     disabled={!toAsset}
                   />
-                  {receiveValue && !isQuoteLoading && (
+                  {receiveValue && (
                     <span className="text-xs text-gray-500 font-medium">
                       $
                       {parseFloat(receiveValue).toLocaleString(undefined, {
@@ -201,7 +266,7 @@ const Swap: React.FC<SwapProps> = () => {
         </div>
 
         <AnimatePresence>
-          {quote && quote.result?.[0]?.feeBips !== undefined && fromAsset && sendValue && parseFloat(sendValue) > 0 && (
+          {quote && quote.result?.[0]?.feeBips !== undefined && fromAsset && sendAmount && parseFloat(sendAmount) > 0 && (
             <motion.div
               initial={{ height: 0, opacity: 0, y: 10 }}
               animate={{ height: "auto", opacity: 1, y: 0 }}
@@ -225,14 +290,14 @@ const Swap: React.FC<SwapProps> = () => {
                     </span>
                   </div>
 
-                  {parseFloat(sendValue) > 0 && (
+                  {sendAmount && parseFloat(sendAmount) > 0 && (
                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                       <span className="text-sm text-gray-600">
                         Fee ({fromAsset.asset.symbol})
                       </span>
                       <span className="text-sm font-medium text-gray-900">
                         {(
-                          (parseFloat(sendValue) * quote.result[0].feeBips) /
+                          (parseFloat(sendAmount) * quote.result[0].feeBips) /
                           10000
                         ).toFixed(
                           fromAsset.asset.decimals > 6
@@ -244,7 +309,7 @@ const Swap: React.FC<SwapProps> = () => {
                     </div>
                   )}
 
-                  {parseFloat(sendValue) > 0 && (
+                  {sendValue && parseFloat(sendValue) > 0 && (
                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                       <span className="text-sm text-gray-600">Fee (USD)</span>
                       <span className="text-sm font-medium text-gray-900">
@@ -260,13 +325,13 @@ const Swap: React.FC<SwapProps> = () => {
                     </div>
                   )}
 
-                  {parseFloat(sendValue) > 0 && receiveAmount && (
+                  {sendAmount && parseFloat(sendAmount) > 0 && receiveAmount && (
                     <div className="flex items-center justify-between py-2">
                       <span className="text-sm text-gray-600">Rate</span>
                       <span className="text-sm font-medium text-gray-900">
                         1 {fromAsset.asset.symbol} ={" "}
                         {(
-                          parseFloat(receiveAmount) / parseFloat(sendValue)
+                          parseFloat(receiveAmount) / parseFloat(sendAmount)
                         ).toFixed(6)}{" "}
                         {toAsset?.asset.symbol || ""}
                       </span>
@@ -307,33 +372,37 @@ const Swap: React.FC<SwapProps> = () => {
         </AnimatePresence>
       </div>
 
+      {orderError && (
+        <div className="w-full mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-sm text-red-800 font-medium">{orderError}</p>
+        </div>
+      )}
+
       <SlideToConfirmButton
         disabled={
           !fromAsset ||
           !toAsset ||
-          !sendValue ||
+          !sendAmount ||
           !quote ||
           !receiveAmount ||
           isLoading ||
-          isQuoteLoading
+          isQuoteLoading ||
+          isCreatingOrder ||
+          !getWalletAddress(fromAsset) ||
+          !getWalletAddress(toAsset)
         }
-        isLoading={isLoading || isQuoteLoading}
+        isLoading={isLoading || isQuoteLoading || isCreatingOrder}
         loadingText={
           isLoading
             ? "Loading Assets..."
             : isQuoteLoading
               ? "Getting Quote..."
-              : "Processing..."
+              : isCreatingOrder
+                ? "Creating Order..."
+                : "Processing..."
         }
         confirmText="Confirm Swap"
-        onConfirm={() => {
-          console.log("Swap confirmed:", {
-            fromAsset,
-            toAsset,
-            sendValue,
-            receiveAmount,
-          });
-        }}
+        onConfirm={handleConfirm}
       />
     </div>
   );
