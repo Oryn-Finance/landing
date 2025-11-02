@@ -16,7 +16,6 @@ const Swap: React.FC<SwapProps> = () => {
     fromAsset,
     toAsset,
     sendValue,
-    sendAmount,
     receiveValue,
     receiveAmount,
     quote,
@@ -25,9 +24,10 @@ const Swap: React.FC<SwapProps> = () => {
     fetchAssets,
     setFromAsset,
     setToAsset,
-    setSendAmount,
     swapAssets,
     setShowHero,
+    resetSwapState,
+    setsendValue,
   } = useAssetsStore();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<"from" | "to" | null>(
@@ -35,9 +35,10 @@ const Swap: React.FC<SwapProps> = () => {
   );
 
   useEffect(() => {
+    resetSwapState();
     fetchAssets();
     setShowHero(true);
-  }, [fetchAssets, setShowHero]);
+  }, [fetchAssets, setShowHero, resetSwapState]);
 
   const handleAssetSelect = (asset: typeof fromAsset, type: "from" | "to") => {
     if (type === "from") {
@@ -49,7 +50,7 @@ const Swap: React.FC<SwapProps> = () => {
   };
 
   return (
-    <div className="mx-auto p-6 max-w-2xl w-full overflow-x-hidden md:overflow-x-visible">
+    <div className="mx-auto p-6 max-w-xl w-full overflow-x-hidden md:overflow-x-visible">
       <div className="relative w-full flex items-center flex-col rounded-3xl px-6 gap-2">
         {/* From Asset */}
         <div className="w-full">
@@ -61,11 +62,11 @@ const Swap: React.FC<SwapProps> = () => {
             height={200}
           />
           <div className="bg-white mb-2 w-full rounded-b-[30px] border-b border-x border-gray-100 p-6">
-            <label className="block text-2xl font-medium text-gray-700 mb-2">
+            <label className="block text-2xl font-medium text-gray-700 mb-4">
               You Pay
             </label>
-            <div className="w-full justify-between gap-2 flex items-center flex-wrap md:flex-nowrap">
-              <div className="w-full md:flex-1 min-w-0">
+            <div className="w-full flex items-center justify-between gap-3">
+              <div className="w-fit">
                 <AssetDropdown
                   type="from"
                   selectedAsset={fromAsset}
@@ -76,13 +77,13 @@ const Swap: React.FC<SwapProps> = () => {
                   onSelect={(asset) => handleAssetSelect(asset, "from")}
                 />
               </div>
-              <div className="relative w-full md:w-2/5 min-w-0">
+              <div className="relative w-fit">
                 <input
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9]*[.,]?[0-9]*"
                   placeholder="0.0"
-                  value={sendAmount}
+                  value={sendValue}
                   onChange={(e) => {
                     let value = e.target.value;
                     // If user types just ".", convert to "0."
@@ -96,9 +97,9 @@ const Swap: React.FC<SwapProps> = () => {
                     if (parts.length > 2) {
                       value = parts[0] + "." + parts.slice(1).join("");
                     }
-                    setSendAmount(value);
+                    setsendValue(value);
                   }}
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e84142]/70 focus:border-transparent"
+                  className="text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-auto min-w-[80px] text-right"
                   disabled={!fromAsset}
                   autoComplete="off"
                 />
@@ -107,7 +108,7 @@ const Swap: React.FC<SwapProps> = () => {
                     {isQuoteLoading && (
                       <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                     )}
-                    <span className="text-xs text-gray-500 font-medium">
+                    <span className="text-xs text-gray-500 font-medium translate-y-6 translate-x-3">
                       $
                       {parseFloat(sendValue).toLocaleString(undefined, {
                         maximumFractionDigits: 2,
@@ -116,7 +117,7 @@ const Swap: React.FC<SwapProps> = () => {
                   </div>
                 )}
                 {!sendValue && isQuoteLoading && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
                     <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 )}
@@ -154,11 +155,11 @@ const Swap: React.FC<SwapProps> = () => {
         {/* To Asset */}
         <div className="w-full mb-4">
           <div className="bg-white w-full rounded-[30px] border-t border-x border-gray-100 p-6">
-            <label className="block text-2xl font-medium text-gray-700 mb-2">
+            <label className="block text-2xl font-medium text-gray-700 mb-4">
               You Receive
             </label>
-            <div className="w-full flex items-center justify-between gap-2 flex-wrap md:flex-nowrap">
-              <div className="w-full md:flex-1 min-w-0">
+            <div className="w-full flex items-center justify-between gap-3">
+              <div className="w-fit">
                 <AssetDropdown
                   type="to"
                   selectedAsset={toAsset}
@@ -169,13 +170,13 @@ const Swap: React.FC<SwapProps> = () => {
                   onSelect={(asset) => handleAssetSelect(asset, "to")}
                 />
               </div>
-              <div className="relative w-full md:w-2/5 min-w-0">
+              <div className="relative w-fit">
                 <input
-                  type="number"
+                  type="decimal"
                   placeholder="0.0"
                   value={receiveAmount}
                   readOnly
-                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none"
+                  className="text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-auto min-w-[80px] text-right"
                   disabled={!toAsset}
                 />
                 {receiveValue && (
@@ -183,7 +184,7 @@ const Swap: React.FC<SwapProps> = () => {
                     {isQuoteLoading && (
                       <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                     )}
-                    <span className="text-xs text-gray-500 font-medium">
+                    <span className="text-xs text-gray-500 font-medium translate-y-6 translate-x-3">
                       $
                       {parseFloat(receiveValue).toLocaleString(undefined, {
                         maximumFractionDigits: 2,
@@ -209,7 +210,7 @@ const Swap: React.FC<SwapProps> = () => {
           <div className="space-y-3">
             {quote?.result?.[0]?.feeBips !== undefined &&
               fromAsset &&
-              sendAmount && (
+              sendValue && (
                 <>
                   {/* Fee in Bips */}
                   <div className="flex items-center justify-between py-2 border-b border-gray-100">
@@ -220,14 +221,14 @@ const Swap: React.FC<SwapProps> = () => {
                   </div>
 
                   {/* Fee in Input Asset */}
-                  {parseFloat(sendAmount) > 0 && (
+                  {parseFloat(sendValue) > 0 && (
                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                       <span className="text-sm text-gray-600">
                         Fee ({fromAsset.asset.symbol})
                       </span>
                       <span className="text-sm font-medium text-gray-900">
                         {(
-                          (parseFloat(sendAmount) * quote.result[0].feeBips) /
+                          (parseFloat(sendValue) * quote.result[0].feeBips) /
                           10000
                         ).toFixed(
                           fromAsset.asset.decimals > 6
@@ -257,13 +258,13 @@ const Swap: React.FC<SwapProps> = () => {
                   )}
 
                   {/* Conversion Rate */}
-                  {parseFloat(sendAmount) > 0 && receiveAmount && (
+                  {parseFloat(sendValue) > 0 && receiveAmount && (
                     <div className="flex items-center justify-between py-2">
                       <span className="text-sm text-gray-600">Rate</span>
                       <span className="text-sm font-medium text-gray-900">
                         1 {fromAsset.asset.symbol} ={" "}
                         {(
-                          parseFloat(receiveAmount) / parseFloat(sendAmount)
+                          parseFloat(receiveAmount) / parseFloat(sendValue)
                         ).toFixed(6)}{" "}
                         {toAsset?.asset.symbol || ""}
                       </span>
@@ -290,9 +291,15 @@ const Swap: React.FC<SwapProps> = () => {
       {/* Bridge Button */}
       <SlideToConfirmButton
         disabled={
-          !fromAsset || !toAsset || !sendAmount || isLoading || isQuoteLoading
+          !fromAsset ||
+          !toAsset ||
+          !sendValue ||
+          !quote ||
+          !receiveAmount ||
+          isLoading ||
+          isQuoteLoading
         }
-        isLoading={isLoading}
+        isLoading={isLoading || isQuoteLoading}
         loadingText={
           isLoading
             ? "Loading Assets..."
@@ -301,13 +308,12 @@ const Swap: React.FC<SwapProps> = () => {
             : "Processing..."
         }
         confirmText="Confirm Swap"
-        className="translate-x-6 max-w-xl"
         onConfirm={() => {
           // Handle swap confirmation here
           console.log("Swap confirmed:", {
             fromAsset,
             toAsset,
-            sendAmount,
+            sendValue,
             receiveAmount,
           });
           // TODO: Implement actual swap logic

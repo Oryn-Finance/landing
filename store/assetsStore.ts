@@ -46,9 +46,8 @@ interface AssetsState {
   assets: AssetOption[];
   fromAsset: AssetOption | null;
   toAsset: AssetOption | null;
-  sendAmount: string;
-  receiveAmount: string;
   sendValue: string;
+  receiveAmount: string;
   receiveValue: string;
   quote: QuoteResponse | null;
   isLoading: boolean;
@@ -61,12 +60,13 @@ interface AssetsState {
   fetchAssets: () => Promise<void>;
   setFromAsset: (asset: AssetOption | null) => void;
   setToAsset: (asset: AssetOption | null) => void;
-  setSendAmount: (amount: string) => void;
+  setsendValue: (amount: string) => void;
   swapAssets: () => void;
   getQuote: () => Promise<void>;
   debouncedGetQuote: () => void;
   clearError: () => void;
   setShowHero: (show: boolean) => void;
+  resetSwapState: () => void;
 }
 
 // Helper to get the canonical asset key for backend (e.g., 'bitcoin' for BTC, 'avax' for AVAX, etc.)
@@ -133,7 +133,6 @@ export const useAssetsStore = create<AssetsState>()(
       assets: [],
       fromAsset: null,
       toAsset: null,
-      sendAmount: "",
       receiveAmount: "",
       sendValue: "",
       receiveValue: "",
@@ -226,8 +225,8 @@ export const useAssetsStore = create<AssetsState>()(
       setFromAsset: (asset) => {
         set({ fromAsset: asset });
         // Auto-fetch quote if both assets are selected and amount is set
-        const { toAsset, sendAmount } = get();
-        if (asset && toAsset && sendAmount && parseFloat(sendAmount) > 0) {
+        const { toAsset, sendValue } = get();
+        if (asset && toAsset && sendValue && parseFloat(sendValue) > 0) {
           get().debouncedGetQuote();
         }
       },
@@ -235,16 +234,16 @@ export const useAssetsStore = create<AssetsState>()(
       setToAsset: (asset) => {
         set({ toAsset: asset });
         // Auto-fetch quote if both assets are selected and amount is set
-        const { fromAsset, sendAmount } = get();
-        if (fromAsset && asset && sendAmount && parseFloat(sendAmount) > 0) {
+        const { fromAsset, sendValue } = get();
+        if (fromAsset && asset && sendValue && parseFloat(sendValue) > 0) {
           get().debouncedGetQuote();
         }
       },
 
-      setSendAmount: (amount) => {
+      setsendValue: (amount) => {
         // Allow empty string, "0.", ".", and valid decimal numbers
         if (amount === "" || amount === "0." || amount === ".") {
-          set({ sendAmount: amount === "." ? "0." : amount });
+          set({ sendValue: amount === "." ? "0." : amount });
           // Clear quote if amount is empty
           if (amount === "") {
             set({
@@ -261,7 +260,7 @@ export const useAssetsStore = create<AssetsState>()(
         const numAmount = parseFloat(amount);
         // Check if it's a valid number (including decimals) and not negative
         if (!isNaN(numAmount) && numAmount >= 0) {
-          set({ sendAmount: amount });
+          set({ sendValue: amount });
           // Auto-fetch quote if both assets are selected and amount is valid
           const { fromAsset, toAsset } = get();
           if (fromAsset && toAsset && amount && numAmount > 0) {
@@ -279,26 +278,26 @@ export const useAssetsStore = create<AssetsState>()(
       },
 
       swapAssets: () => {
-        const { fromAsset, toAsset, sendValue, receiveValue } = get();
+        const { fromAsset, toAsset, sendValue } = get();
         set({
           fromAsset: toAsset,
           toAsset: fromAsset,
-          sendAmount: get().receiveAmount,
-          receiveAmount: get().sendAmount,
-          sendValue: receiveValue,
+          sendValue: get().receiveAmount,
+          receiveAmount: get().sendValue,
           receiveValue: sendValue,
+          quote: null,
         });
-        // Auto-fetch quote after swap if amount is valid
-        const newAmount = get().sendAmount;
-        if (toAsset && fromAsset && newAmount && parseFloat(newAmount) > 0) {
+        // Auto-fetch quote for the new fromAsset (old toAsset) with current sendValue
+        if (toAsset && sendValue && parseFloat(sendValue) > 0) {
+          // Use the swapped assets - toAsset is now the fromAsset
           get().debouncedGetQuote();
         }
       },
 
       debouncedGetQuote: debounce(async () => {
-        const { fromAsset, toAsset, sendAmount } = get();
+        const { fromAsset, toAsset, sendValue } = get();
 
-        if (!fromAsset || !toAsset || !sendAmount) {
+        if (!fromAsset || !toAsset || !sendValue) {
           set({
             quote: null,
             sendValue: "",
@@ -308,7 +307,7 @@ export const useAssetsStore = create<AssetsState>()(
           return;
         }
 
-        const numAmount = parseFloat(sendAmount);
+        const numAmount = parseFloat(sendValue);
         if (numAmount <= 0 || isNaN(numAmount)) {
           set({
             quote: null,
@@ -381,7 +380,7 @@ export const useAssetsStore = create<AssetsState>()(
           // In production, you might want to just set an error state
           const mockReceiveAmount = "";
           const mockReceiveValue = "";
-          const mockSendValue = (parseFloat(sendAmount) * 111116.62).toFixed(2);
+          const mockSendValue = (parseFloat(sendValue) * 111116.62).toFixed(2);
           set({
             error: "Using demo quote (API unavailable)",
             receiveAmount: mockReceiveAmount,
@@ -394,9 +393,9 @@ export const useAssetsStore = create<AssetsState>()(
       }, 500), // 500ms debounce
 
       getQuote: async () => {
-        const { fromAsset, toAsset, sendAmount } = get();
+        const { fromAsset, toAsset, sendValue } = get();
 
-        if (!fromAsset || !toAsset || !sendAmount) {
+        if (!fromAsset || !toAsset || !sendValue) {
           set({
             quote: null,
             sendValue: "",
@@ -406,7 +405,7 @@ export const useAssetsStore = create<AssetsState>()(
           return;
         }
 
-        const numAmount = parseFloat(sendAmount);
+        const numAmount = parseFloat(sendValue);
         if (numAmount <= 0 || isNaN(numAmount)) {
           set({
             quote: null,
@@ -477,13 +476,11 @@ export const useAssetsStore = create<AssetsState>()(
 
           // For landing page demo: provide mock quote if API fails
           // In production, you might want to just set an error state
-          const mockReceiveAmount = (parseFloat(sendAmount) * 114989).toFixed(
+          const mockReceiveAmount = (parseFloat(sendValue) * 114989).toFixed(2);
+          const mockReceiveValue = (parseFloat(sendValue) * 111116.62).toFixed(
             2
           );
-          const mockReceiveValue = (parseFloat(sendAmount) * 111116.62).toFixed(
-            2
-          );
-          const mockSendValue = (parseFloat(sendAmount) * 111116.62).toFixed(2);
+          const mockSendValue = (parseFloat(sendValue) * 111116.62).toFixed(2);
           set({
             error: "Using demo quote (API unavailable)",
             receiveAmount: mockReceiveAmount,
@@ -498,14 +495,20 @@ export const useAssetsStore = create<AssetsState>()(
       setShowHero: (show: boolean) => set({ showHero: show }),
 
       clearError: () => set({ error: null }),
+
+      resetSwapState: () =>
+        set({
+          fromAsset: null,
+          toAsset: null,
+          sendValue: "",
+          receiveAmount: "",
+          quote: null,
+          error: null,
+        }),
     }),
     {
       name: "assets-store",
       partialize: (state) => ({
-        fromAsset: state.fromAsset,
-        toAsset: state.toAsset,
-        sendAmount: state.sendAmount,
-        receiveAmount: state.receiveAmount,
         showHero: state.showHero,
       }),
     }

@@ -103,7 +103,7 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   if (isLoading) {
     return (
       <div
-        className={`relative w-full h-16 rounded-2xl flex items-center justify-center ${className}`}
+        className={`relative w-full h-16 rounded-2xl max-w-xl flex items-center justify-center ${className}`}
       >
         <div className="flex items-center justify-center text-white">
           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
