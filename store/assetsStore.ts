@@ -64,6 +64,7 @@ interface AssetsState {
   debouncedGetQuote: () => void;
   clearError: () => void;
   setShowHero: (show: boolean) => void;
+  resetSwapState: () => void;
 }
 
 // Helper to get the canonical asset key for backend (e.g., 'bitcoin' for BTC, 'avax' for AVAX, etc.)
@@ -173,16 +174,17 @@ export const useAssetsStore = create<AssetsState>()(
       },
 
       swapAssets: () => {
-        const { fromAsset, toAsset } = get();
+        const { fromAsset, toAsset, sendAmount } = get();
+        // Swap assets only, keep sendAmount the same
         set({
           fromAsset: toAsset,
           toAsset: fromAsset,
-          sendAmount: get().receiveAmount,
-          receiveAmount: get().sendAmount,
+          receiveAmount: "", // Clear receiveAmount to wait for new quote
+          quote: null, // Clear existing quote
         });
-        // Auto-fetch quote after swap if amount is valid
-        const newAmount = get().sendAmount;
-        if (toAsset && fromAsset && newAmount && parseFloat(newAmount) > 0) {
+        // Auto-fetch quote for the new fromAsset (old toAsset) with current sendAmount
+        if (toAsset && sendAmount && parseFloat(sendAmount) > 0) {
+          // Use the swapped assets - toAsset is now the fromAsset
           get().debouncedGetQuote();
         }
       },
@@ -324,14 +326,19 @@ export const useAssetsStore = create<AssetsState>()(
       setShowHero: (show: boolean) => set({ showHero: show }),
 
       clearError: () => set({ error: null }),
+
+      resetSwapState: () => set({
+        fromAsset: null,
+        toAsset: null,
+        sendAmount: "",
+        receiveAmount: "",
+        quote: null,
+        error: null,
+      }),
     }),
     {
       name: "assets-store",
       partialize: (state) => ({
-        fromAsset: state.fromAsset,
-        toAsset: state.toAsset,
-        sendAmount: state.sendAmount,
-        receiveAmount: state.receiveAmount,
         showHero: state.showHero,
       }),
     }

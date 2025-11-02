@@ -96,19 +96,6 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   // Convert to pixels as a string
   const progressWidthString = useTransform(progressWidthPx, (w) => `${w}px`);
 
-  if (isLoading) {
-    return (
-      <div
-        className={`relative w-full h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center ${className}`}
-      >
-        <div className="flex items-center justify-center text-white">
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
-          {loadingText}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       ref={containerRef}
