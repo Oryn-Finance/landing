@@ -28,7 +28,7 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   const [containerWidth, setContainerWidth] = useState(300);
   const thumbSize = 48; // w-12 = 48px
   const thumbPadding = 8; // left-2 = 8px
-  const maxDrag = containerWidth - thumbSize - (thumbPadding * 2); // Maximum drag distance
+  const maxDrag = containerWidth - thumbSize - thumbPadding * 2; // Maximum drag distance
 
   const opacity = useTransform(x, [0, maxDrag], [0.3, 1]);
   const scale = useTransform(x, [0, maxDrag], [0.8, 1]);
@@ -42,10 +42,8 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isConfirmed) {
+    if (isConfirmed && maxDrag > 0) {
       x.set(maxDrag);
-    } else {
-      x.set(0);
     }
   }, [isConfirmed, x, maxDrag]);
 
@@ -55,19 +53,25 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   ) => {
     setIsDragging(false);
 
-    if (info.offset.x >= maxDrag * 0.8) {
-      // User dragged far enough to confirm
+    // Use 90% threshold as requested
+    const confirmThreshold = maxDrag * 0.9;
+
+    if (info.offset.x >= confirmThreshold) {
+      // User dragged far enough to confirm (90%)
       setIsConfirmed(true);
+      // Animate to the end
+      x.set(maxDrag);
+
       setTimeout(() => {
         onConfirm();
-        // Reset after a short delay
+        // Reset after a delay
         setTimeout(() => {
           setIsConfirmed(false);
           x.set(0);
         }, 1000);
       }, 300);
     } else {
-      // Snap back to start
+      // Snap back to start with animation
       x.set(0);
     }
   };
@@ -99,15 +103,16 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative w-[95%] h-16 bg-gray-200 rounded-full overflow-hidden ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-        } ${className}`}
+      className={`relative w-[95%] h-16 bg-gray-200 rounded-full overflow-hidden ${
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+      } ${className}`}
     >
       {/* Filled progress background - purple-blue gradient on left side */}
       <motion.div
         style={{
           width: progressWidthString,
         }}
-        className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full"
+        className="absolute left-0 top-0 bottom-0 bg-linear-to-r from-purple-600 to-blue-600 rounded-full"
       />
 
       {/* Background with arrow */}
@@ -136,15 +141,23 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
 
       {/* Draggable thumb - always visible */}
       <motion.div
-        drag={disabled ? false : "x"}
+        drag={disabled || isLoading ? false : "x"}
         dragConstraints={{ left: 0, right: maxDrag }}
         dragElastic={0.1}
+        dragMomentum={false}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        style={{ x }}
-        className={`absolute top-2 left-2 w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing z-20 ${isDragging ? "shadow-xl" : ""
-          }`}
+        style={{
+          x,
+          transition: isDragging
+            ? undefined
+            : { type: "spring", stiffness: 300, damping: 30 },
+        }}
+        className={`absolute top-2 left-2 w-12 h-12 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing z-20 ${
+          isDragging ? "" : ""
+        }`}
         whileDrag={{ scale: 1.1 }}
+        animate={isConfirmed ? { x: maxDrag } : undefined}
       >
         {/* Arrow icon in the thumb */}
         <svg

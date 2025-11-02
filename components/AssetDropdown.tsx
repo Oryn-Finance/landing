@@ -3,14 +3,14 @@
 import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAssetsStore, type AssetOption } from "../store/assetsStore";
+import Image from "next/image";
 
-// Asset and chain logo URLs
 const ASSET_LOGOS: Record<string, string> = {
   wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
   avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
   usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
   bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  strk: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png"
+  strk: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
 };
 
 const CHAIN_LOGOS: Record<string, string> = {
@@ -25,7 +25,6 @@ const CHAIN_LOGOS: Record<string, string> = {
 
 function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
   const key = symbol.toLowerCase();
-  console.log(key)
   let url: string | undefined;
   if (key === "btc" || key === "bitcoin") url = ASSET_LOGOS.bitcoin;
   else if (key === "usdc") url = ASSET_LOGOS.usdc;
@@ -40,11 +39,13 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
 
   if (url) {
     return (
-      <img
+      <Image
         src={url}
         alt={symbol}
         className={`${sizeClasses[size]} rounded-full object-contain`}
         style={{ background: "#fff" }}
+        width={200}
+        height={200}
       />
     );
   }

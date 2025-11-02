@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAccount, useDisconnect, useConnect } from "wagmi";
 import { useWalletStore } from "../store/walletStore";
 import { X, Zap } from "lucide-react";
+import Image from "next/image";
 
 interface ConnectWalletModalProps {
   open: boolean;
@@ -75,8 +76,8 @@ export function ConnectWalletModal({
       setIsMobile(window.innerWidth < 900);
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Reset bottom sheet height when modal closes
@@ -134,25 +135,33 @@ export function ConnectWalletModal({
       id: "okx-btc",
       name: "OKX Wallet",
       description: "Connect your Bitcoin wallet",
-      available: typeof window !== "undefined" && typeof (window as any).okxwallet !== "undefined",
+      available:
+        typeof window !== "undefined" &&
+        typeof (window as any).okxwallet !== "undefined",
     },
     {
       id: "unisat",
       name: "Unisat wallet",
       description: "Connect your Bitcoin wallet",
-      available: typeof window !== "undefined" && typeof (window as any).unisat !== "undefined",
+      available:
+        typeof window !== "undefined" &&
+        typeof (window as any).unisat !== "undefined",
     },
     {
       id: "xverse",
       name: "Xverse Wallet",
       description: "Connect your Bitcoin wallet",
-      available: typeof window !== "undefined" && typeof (window as any).XverseProviders !== "undefined",
+      available:
+        typeof window !== "undefined" &&
+        typeof (window as any).XverseProviders !== "undefined",
     },
     {
       id: "hiro",
       name: "Hiro Wallet",
       description: "Connect your Bitcoin wallet",
-      available: typeof window !== "undefined" && typeof (window as any).btc !== "undefined",
+      available:
+        typeof window !== "undefined" &&
+        typeof (window as any).btc !== "undefined",
     },
   ];
 
@@ -174,24 +183,25 @@ export function ConnectWalletModal({
             initial={{
               y: isMobile ? "100%" : 0,
               scale: isMobile ? 1 : 0.95,
-              opacity: 0
+              opacity: 0,
             }}
             animate={{
               y: 0,
               scale: 1,
               opacity: 1,
-              height: isMobile ? bottomSheetHeight : "600px"
+              height: isMobile ? bottomSheetHeight : "600px",
             }}
             exit={{
               y: isMobile ? "100%" : 0,
               scale: isMobile ? 1 : 0.95,
-              opacity: 0
+              opacity: 0,
             }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`bg-white shadow-xl overflow-hidden flex flex-col z-50 transition-all duration-300 ${isMobile
-              ? "fixed bottom-0 left-0 right-0 rounded-t-[24px] rounded-b-none"
-              : "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl max-w-2xl w-full h-[600px]"
-              }`}
+            className={`bg-white shadow-xl overflow-hidden flex flex-col z-50 transition-all duration-300 ${
+              isMobile
+                ? "fixed bottom-0 left-0 right-0 rounded-t-[24px] rounded-b-none"
+                : "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl max-w-2xl w-full h-[600px]"
+            }`}
             onClick={(e) => e.stopPropagation()}
             style={{
               height: isMobile ? bottomSheetHeight : "600px",
@@ -220,19 +230,21 @@ export function ConnectWalletModal({
             <div className="px-4 md:px-6 pt-2 md:pt-4 shrink-0 border-b border-gray-100">
               <div className="flex space-x-2">
                 <button
-                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${activeTab === "evm"
-                    ? "bg-blue-50 text-blue-700 border-b-2 border-blue-500"
-                    : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
-                    }`}
+                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
+                    activeTab === "evm"
+                      ? "bg-blue-50 text-blue-700 border-b-2 border-blue-500"
+                      : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
+                  }`}
                   onClick={() => setActiveTab("evm")}
                 >
                   EVM Wallets
                 </button>
                 <button
-                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${activeTab === "btc"
-                    ? "bg-orange-50 text-orange-700 border-b-2 border-orange-500"
-                    : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
-                    }`}
+                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
+                    activeTab === "btc"
+                      ? "bg-orange-50 text-orange-700 border-b-2 border-orange-500"
+                      : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
+                  }`}
                   onClick={() => setActiveTab("btc")}
                 >
                   Bitcoin Wallets
@@ -241,10 +253,7 @@ export function ConnectWalletModal({
             </div>
 
             {/* Content - Scrollable */}
-            <div
-              className="flex-1 overflow-y-auto"
-              onScroll={handleScroll}
-            >
+            <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
               <div className="p-4 md:p-6 pt-2 md:pt-4">
                 {/* EVM Wallets - Only show when EVM tab is active */}
                 {activeTab === "evm" && (
@@ -262,10 +271,12 @@ export function ConnectWalletModal({
                         >
                           <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                             {iconUrl ? (
-                              <img
+                              <Image
                                 src={iconUrl}
                                 alt={connector.name}
                                 className="w-8 h-8"
+                                width={32}
+                                height={32}
                               />
                             ) : (
                               <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded">
@@ -309,10 +320,12 @@ export function ConnectWalletModal({
                           >
                             <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                               {iconUrl ? (
-                                <img
+                                <Image
                                   src={iconUrl}
                                   alt={wallet.name || "Wallet"}
                                   className="w-8 h-8"
+                                  width={32}
+                                  height={32}
                                 />
                               ) : (
                                 <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded">
@@ -327,7 +340,8 @@ export function ConnectWalletModal({
                                 {wallet.name || "Bitcoin Wallet"}
                               </p>
                               <p className="text-xs md:text-sm text-gray-500 truncate">
-                                {wallet.description || "Connect your Bitcoin wallet"}
+                                {wallet.description ||
+                                  "Connect your Bitcoin wallet"}
                               </p>
                             </div>
                             {loadingBTC && (
@@ -339,9 +353,12 @@ export function ConnectWalletModal({
                     ) : (
                       <div className="col-span-2 text-center py-8">
                         <Zap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500">No Bitcoin wallets available</p>
+                        <p className="text-gray-500">
+                          No Bitcoin wallets available
+                        </p>
                         <p className="text-sm text-gray-400 mt-1">
-                          Make sure you have a Bitcoin wallet extension installed
+                          Make sure you have a Bitcoin wallet extension
+                          installed
                         </p>
                       </div>
                     )}

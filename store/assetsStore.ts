@@ -34,6 +34,7 @@ export type QuoteLeg = {
 export type QuoteResult = {
   source: QuoteLeg;
   destination: QuoteLeg;
+  feeBips?: number;
 };
 
 export type QuoteResponse = {
@@ -45,8 +46,9 @@ interface AssetsState {
   assets: AssetOption[];
   fromAsset: AssetOption | null;
   toAsset: AssetOption | null;
-  sendAmount: string;
+  sendValue: string;
   receiveAmount: string;
+  receiveValue: string;
   quote: QuoteResponse | null;
   isLoading: boolean;
   isQuoteLoading: boolean;
@@ -58,7 +60,7 @@ interface AssetsState {
   fetchAssets: () => Promise<void>;
   setFromAsset: (asset: AssetOption | null) => void;
   setToAsset: (asset: AssetOption | null) => void;
-  setSendAmount: (amount: string) => void;
+  setsendValue: (amount: string) => void;
   swapAssets: () => void;
   getQuote: () => Promise<void>;
   debouncedGetQuote: () => void;
@@ -74,13 +76,43 @@ function getAssetKeyFromSymbol(symbol: string): string {
     btc: "bitcoin",
     avax: "avax",
     usdc: "usdc",
+    wbtc: "wbtc",
   };
   return map[symbol.toLowerCase()] || symbol.toLowerCase();
 }
 
+// Helper to map chain ID to backend format
+function mapChainIdToBackendFormat(chainId: string): string {
+  const chainIdLower = chainId.toLowerCase().trim();
+
+  // If already in correct format, return as-is
+  if (chainIdLower === "bitcoin_testnet") {
+    return "bitcoin_testnet";
+  }
+
+  if (chainIdLower === "arbitrum_sepolia") {
+    return "arbitrum_sepolia";
+  }
+
+  // Map Bitcoin chain IDs to bitcoin_testnet
+  if (chainIdLower === "bitcoin" || chainIdLower.includes("bitcoin testnet")) {
+    return "bitcoin_testnet";
+  }
+
+  // Map Arbitrum Sepolia variations
+  if (chainIdLower.includes("arbitrum") && chainIdLower.includes("sepolia")) {
+    return "arbitrum_sepolia";
+  }
+
+  // Return as-is for other chains
+  return chainId;
+}
+
 // Helper to build the correct value for backend param (chainId:assetKey)
 function buildBackendAssetValue(chainId: string, asset: Asset): string {
-  return `${chainId}:${getAssetKeyFromSymbol(asset.symbol)}`;
+  const mappedChainId = mapChainIdToBackendFormat(chainId);
+  const assetKey = getAssetKeyFromSymbol(asset.symbol);
+  return `${mappedChainId}:${assetKey}`;
 }
 
 // Debounce helper
@@ -101,8 +133,9 @@ export const useAssetsStore = create<AssetsState>()(
       assets: [],
       fromAsset: null,
       toAsset: null,
-      sendAmount: "",
       receiveAmount: "",
+      sendValue: "",
+      receiveValue: "",
       quote: null,
       isLoading: false,
       isQuoteLoading: false,
@@ -112,10 +145,21 @@ export const useAssetsStore = create<AssetsState>()(
       fetchAssets: async () => {
         try {
           set({ isLoading: true, error: null });
-          const response = await axios.get(`${API_URLS.QUOTE}/chains`);
-          const chains: Chain[] = response.data.result;
 
-          console.log(chains);
+          // Construct URL properly (handle trailing slash)
+          const baseUrl = API_URLS.QUOTE.endsWith("/")
+            ? API_URLS.QUOTE.slice(0, -1)
+            : API_URLS.QUOTE;
+          const url = `${baseUrl}/chains`;
+
+          const response = await axios.get(url, {
+            timeout: 10000, // 10 second timeout
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          const chains: Chain[] = response.data.result;
 
           const flatOptions: AssetOption[] = [];
           chains.forEach((chain) => {
@@ -132,8 +176,47 @@ export const useAssetsStore = create<AssetsState>()(
           set({ assets: flatOptions, isLoading: false });
         } catch (error) {
           console.error("Failed to fetch assets:", error);
+
+          // Provide fallback mock data for landing page demo
+          const mockAssets: AssetOption[] = [
+            {
+              chainId: "bitcoin",
+              chainName: "Bitcoin",
+              asset: {
+                symbol: "BTC",
+                name: "Bitcoin",
+                decimals: 8,
+                cmcId: 1,
+              },
+              value: "bitcoin:BTC",
+            },
+            {
+              chainId: "avalanche",
+              chainName: "Avalanche",
+              asset: {
+                symbol: "USDC",
+                name: "USD Coin",
+                decimals: 6,
+                cmcId: 3408,
+              },
+              value: "avalanche:USDC",
+            },
+            {
+              chainId: "avalanche",
+              chainName: "Avalanche",
+              asset: {
+                symbol: "AVAX",
+                name: "Avalanche",
+                decimals: 18,
+                cmcId: 5805,
+              },
+              value: "avalanche:AVAX",
+            },
+          ];
+
           set({
-            error: "Failed to fetch supported assets",
+            assets: mockAssets,
+            error: "Using demo assets (API unavailable)",
             isLoading: false,
           });
         }
@@ -142,8 +225,8 @@ export const useAssetsStore = create<AssetsState>()(
       setFromAsset: (asset) => {
         set({ fromAsset: asset });
         // Auto-fetch quote if both assets are selected and amount is set
-        const { toAsset, sendAmount } = get();
-        if (asset && toAsset && sendAmount && parseFloat(sendAmount) > 0) {
+        const { toAsset, sendValue } = get();
+        if (asset && toAsset && sendValue && parseFloat(sendValue) > 0) {
           get().debouncedGetQuote();
         }
       },
@@ -151,55 +234,88 @@ export const useAssetsStore = create<AssetsState>()(
       setToAsset: (asset) => {
         set({ toAsset: asset });
         // Auto-fetch quote if both assets are selected and amount is set
-        const { fromAsset, sendAmount } = get();
-        if (fromAsset && asset && sendAmount && parseFloat(sendAmount) > 0) {
+        const { fromAsset, sendValue } = get();
+        if (fromAsset && asset && sendValue && parseFloat(sendValue) > 0) {
           get().debouncedGetQuote();
         }
       },
 
-      setSendAmount: (amount) => {
-        // Prevent negative numbers and invalid input
+      setsendValue: (amount) => {
+        // Allow empty string, "0.", ".", and valid decimal numbers
+        if (amount === "" || amount === "0." || amount === ".") {
+          set({ sendValue: amount === "." ? "0." : amount });
+          // Clear quote if amount is empty
+          if (amount === "") {
+            set({
+              quote: null,
+              receiveAmount: "",
+              receiveValue: "",
+              sendValue: "",
+            });
+          }
+          return;
+        }
+
+        // Validate numeric input (allows decimals)
         const numAmount = parseFloat(amount);
-        if (amount === "" || (numAmount >= 0 && !isNaN(numAmount))) {
-          set({ sendAmount: amount });
+        // Check if it's a valid number (including decimals) and not negative
+        if (!isNaN(numAmount) && numAmount >= 0) {
+          set({ sendValue: amount });
           // Auto-fetch quote if both assets are selected and amount is valid
           const { fromAsset, toAsset } = get();
           if (fromAsset && toAsset && amount && numAmount > 0) {
             get().debouncedGetQuote();
-          } else if (amount === "" || numAmount === 0) {
-            // Clear quote if amount is empty or zero
-            set({ quote: null, receiveAmount: "" });
+          } else if (numAmount === 0) {
+            // Clear quote if amount is zero
+            set({
+              quote: null,
+              receiveAmount: "",
+              receiveValue: "",
+              sendValue: "",
+            });
           }
         }
       },
 
       swapAssets: () => {
-        const { fromAsset, toAsset, sendAmount } = get();
-        // Swap assets only, keep sendAmount the same
+        const { fromAsset, toAsset, sendValue } = get();
         set({
           fromAsset: toAsset,
           toAsset: fromAsset,
-          receiveAmount: "", // Clear receiveAmount to wait for new quote
-          quote: null, // Clear existing quote
+          sendValue: get().receiveAmount,
+          receiveAmount: get().sendValue,
+          receiveValue: sendValue,
+          quote: null,
         });
-        // Auto-fetch quote for the new fromAsset (old toAsset) with current sendAmount
-        if (toAsset && sendAmount && parseFloat(sendAmount) > 0) {
+        // Auto-fetch quote for the new fromAsset (old toAsset) with current sendValue
+        if (toAsset && sendValue && parseFloat(sendValue) > 0) {
           // Use the swapped assets - toAsset is now the fromAsset
           get().debouncedGetQuote();
         }
       },
 
       debouncedGetQuote: debounce(async () => {
-        const { fromAsset, toAsset, sendAmount } = get();
+        const { fromAsset, toAsset, sendValue } = get();
 
-        if (!fromAsset || !toAsset || !sendAmount) {
-          set({ quote: null, isQuoteLoading: false });
+        if (!fromAsset || !toAsset || !sendValue) {
+          set({
+            quote: null,
+            sendValue: "",
+            receiveValue: "",
+            isQuoteLoading: false,
+          });
           return;
         }
 
-        const numAmount = parseFloat(sendAmount);
+        const numAmount = parseFloat(sendValue);
         if (numAmount <= 0 || isNaN(numAmount)) {
-          set({ quote: null, receiveAmount: "", isQuoteLoading: false });
+          set({
+            quote: null,
+            receiveAmount: "",
+            sendValue: "",
+            receiveValue: "",
+            isQuoteLoading: false,
+          });
           return;
         }
 
@@ -207,7 +323,7 @@ export const useAssetsStore = create<AssetsState>()(
           set({ isQuoteLoading: true, error: null });
 
           // Format amount based on decimals
-          const formattedAmount = (
+          const formattedAmount = BigInt(
             numAmount * Math.pow(10, fromAsset.asset.decimals)
           ).toString();
 
@@ -221,11 +337,20 @@ export const useAssetsStore = create<AssetsState>()(
             toAsset.asset
           );
 
-          const url = `${API_URLS.QUOTE}/quote?from=${encodeURIComponent(
+          // Construct URL properly (handle trailing slash)
+          const baseUrl = API_URLS.QUOTE.endsWith("/")
+            ? API_URLS.QUOTE.slice(0, -1)
+            : API_URLS.QUOTE;
+          const url = `${baseUrl}/quote?from=${encodeURIComponent(
             fromParam
           )}&to=${encodeURIComponent(toParam)}&amount=${formattedAmount}`;
 
-          const response = await axios.get<QuoteResponse>(url);
+          const response = await axios.get<QuoteResponse>(url, {
+            timeout: 10000,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
 
           if (
             response.data.status === "Ok" &&
@@ -237,6 +362,8 @@ export const useAssetsStore = create<AssetsState>()(
             set({
               quote: response.data,
               receiveAmount: quoteResult.destination.display,
+              sendValue: quoteResult.source.value,
+              receiveValue: quoteResult.destination.value,
               isQuoteLoading: false,
             });
           } else {
@@ -248,8 +375,17 @@ export const useAssetsStore = create<AssetsState>()(
           }
         } catch (error) {
           console.error("Failed to get quote:", error);
+
+          // For landing page demo: provide mock quote if API fails
+          // In production, you might want to just set an error state
+          const mockReceiveAmount = "";
+          const mockReceiveValue = "";
+          const mockSendValue = (parseFloat(sendValue) * 111116.62).toFixed(2);
           set({
-            error: "Failed to get quote",
+            error: "Using demo quote (API unavailable)",
+            receiveAmount: mockReceiveAmount,
+            sendValue: mockSendValue,
+            receiveValue: mockReceiveValue,
             isQuoteLoading: false,
             quote: null,
           });
@@ -257,16 +393,27 @@ export const useAssetsStore = create<AssetsState>()(
       }, 500), // 500ms debounce
 
       getQuote: async () => {
-        const { fromAsset, toAsset, sendAmount } = get();
+        const { fromAsset, toAsset, sendValue } = get();
 
-        if (!fromAsset || !toAsset || !sendAmount) {
-          set({ quote: null, isQuoteLoading: false });
+        if (!fromAsset || !toAsset || !sendValue) {
+          set({
+            quote: null,
+            sendValue: "",
+            receiveValue: "",
+            isQuoteLoading: false,
+          });
           return;
         }
 
-        const numAmount = parseFloat(sendAmount);
+        const numAmount = parseFloat(sendValue);
         if (numAmount <= 0 || isNaN(numAmount)) {
-          set({ quote: null, receiveAmount: "", isQuoteLoading: false });
+          set({
+            quote: null,
+            receiveAmount: "",
+            sendValue: "",
+            receiveValue: "",
+            isQuoteLoading: false,
+          });
           return;
         }
 
@@ -288,11 +435,20 @@ export const useAssetsStore = create<AssetsState>()(
             toAsset.asset
           );
 
-          const url = `${API_URLS.QUOTE}/quote?from=${encodeURIComponent(
+          // Construct URL properly (handle trailing slash)
+          const baseUrl = API_URLS.QUOTE.endsWith("/")
+            ? API_URLS.QUOTE.slice(0, -1)
+            : API_URLS.QUOTE;
+          const url = `${baseUrl}/quote?from=${encodeURIComponent(
             fromParam
           )}&to=${encodeURIComponent(toParam)}&amount=${formattedAmount}`;
 
-          const response = await axios.get<QuoteResponse>(url);
+          const response = await axios.get<QuoteResponse>(url, {
+            timeout: 10000,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
 
           if (
             response.data.status === "Ok" &&
@@ -304,6 +460,8 @@ export const useAssetsStore = create<AssetsState>()(
             set({
               quote: response.data,
               receiveAmount: quoteResult.destination.display,
+              sendValue: quoteResult.source.value,
+              receiveValue: quoteResult.destination.value,
               isQuoteLoading: false,
             });
           } else {
@@ -315,8 +473,19 @@ export const useAssetsStore = create<AssetsState>()(
           }
         } catch (error) {
           console.error("Failed to get quote:", error);
+
+          // For landing page demo: provide mock quote if API fails
+          // In production, you might want to just set an error state
+          const mockReceiveAmount = (parseFloat(sendValue) * 114989).toFixed(2);
+          const mockReceiveValue = (parseFloat(sendValue) * 111116.62).toFixed(
+            2
+          );
+          const mockSendValue = (parseFloat(sendValue) * 111116.62).toFixed(2);
           set({
-            error: "Failed to get quote",
+            error: "Using demo quote (API unavailable)",
+            receiveAmount: mockReceiveAmount,
+            sendValue: mockSendValue,
+            receiveValue: mockReceiveValue,
             isQuoteLoading: false,
             quote: null,
           });
@@ -327,14 +496,15 @@ export const useAssetsStore = create<AssetsState>()(
 
       clearError: () => set({ error: null }),
 
-      resetSwapState: () => set({
-        fromAsset: null,
-        toAsset: null,
-        sendAmount: "",
-        receiveAmount: "",
-        quote: null,
-        error: null,
-      }),
+      resetSwapState: () =>
+        set({
+          fromAsset: null,
+          toAsset: null,
+          sendValue: "",
+          receiveAmount: "",
+          quote: null,
+          error: null,
+        }),
     }),
     {
       name: "assets-store",
