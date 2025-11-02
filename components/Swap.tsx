@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import { AssetDropdown } from "./AssetDropdown";
 import SlideToConfirmButton from "./SlideToConfirmButton";
 import { useAssetsStore } from "../store/assetsStore";
-import { AlertCircle } from "lucide-react";
 
 interface SwapProps {
   onOrderCreated?: (orderId: string) => void;
@@ -17,6 +16,7 @@ const Swap: React.FC<SwapProps> = () => {
     toAsset,
     sendAmount,
     receiveAmount,
+    quote,
     isLoading,
     isQuoteLoading,
     fetchAssets,
@@ -25,6 +25,7 @@ const Swap: React.FC<SwapProps> = () => {
     setSendAmount,
     swapAssets,
     setShowHero,
+    resetSwapState,
   } = useAssetsStore();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<"from" | "to" | null>(
@@ -32,9 +33,10 @@ const Swap: React.FC<SwapProps> = () => {
   );
 
   useEffect(() => {
+    resetSwapState();
     fetchAssets();
     setShowHero(true);
-  }, [fetchAssets, setShowHero]);
+  }, [fetchAssets, setShowHero, resetSwapState]);
 
   const handleAssetSelect = (asset: typeof fromAsset, type: "from" | "to") => {
     if (type === "from") {
@@ -46,7 +48,7 @@ const Swap: React.FC<SwapProps> = () => {
   };
 
   return (
-    <div className="mx-auto p-6 max-w-2xl w-full overflow-x-hidden md:overflow-x-visible">
+    <div className="mx-auto p-6 max-w-xl w-full overflow-x-hidden md:overflow-x-visible">
       <div className="relative w-full flex items-center flex-col rounded-3xl p-6">
         {/* From Asset */}
         <div className="w-full">
@@ -56,11 +58,11 @@ const Swap: React.FC<SwapProps> = () => {
             className="w-full h-10 -mb-1"
           />
           <div className="bg-white mb-2 w-full rounded-b-[30px] border-b border-x border-gray-100 p-6">
-            <label className="block text-2xl font-medium text-gray-700 mb-2">
+            <label className="block text-2xl font-medium text-gray-700 mb-4">
               You Pay
             </label>
-            <div className="w-full justify-between gap-2 flex items-center flex-wrap md:flex-nowrap">
-              <div className="w-full md:flex-initial md:flex-1 min-w-0">
+            <div className="w-full flex items-center justify-between gap-3">
+              <div className="w-fit">
                 <AssetDropdown
                   type="from"
                   selectedAsset={fromAsset}
@@ -71,19 +73,19 @@ const Swap: React.FC<SwapProps> = () => {
                   onSelect={(asset) => handleAssetSelect(asset, "from")}
                 />
               </div>
-              <div className="relative w-full md:w-1/2 min-w-0">
+              <div className="relative w-fit">
                 <input
                   inputMode="decimal"
                   pattern="[0-9]*[.,]?[0-9]*"
                   placeholder="0.0"
                   value={sendAmount}
                   onChange={(e) => setSendAmount(e.target.value)}
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#e84142]/70 focus:border-transparent"
+                  className="text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-auto min-w-[80px] text-right"
                   disabled={!fromAsset}
                   autoComplete="off"
                 />
                 {isQuoteLoading && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
                     <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 )}
@@ -121,11 +123,11 @@ const Swap: React.FC<SwapProps> = () => {
         {/* To Asset */}
         <div className="w-full mb-4">
           <div className="bg-white w-full rounded-t-[30px] border-t border-x border-gray-100 p-6">
-            <label className="block text-2xl font-medium text-gray-700 mb-2">
+            <label className="block text-2xl font-medium text-gray-700 mb-4">
               You Receive
             </label>
-            <div className="w-full flex items-center justify-between gap-2 flex-wrap md:flex-nowrap">
-              <div className="w-full md:flex-initial md:flex-1 min-w-0">
+            <div className="w-full flex items-center justify-between gap-3">
+              <div className="w-fit">
                 <AssetDropdown
                   type="to"
                   selectedAsset={toAsset}
@@ -136,20 +138,15 @@ const Swap: React.FC<SwapProps> = () => {
                   onSelect={(asset) => handleAssetSelect(asset, "to")}
                 />
               </div>
-              <div className="relative w-full md:w-1/2 min-w-0">
+              <div className="relative w-fit">
                 <input
-                  type="number"
+                  type="decimal"
                   placeholder="0.0"
                   value={receiveAmount}
                   readOnly
-                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none"
+                  className="text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-auto min-w-[80px] text-right"
                   disabled={!toAsset}
                 />
-                {isQuoteLoading && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -166,6 +163,8 @@ const Swap: React.FC<SwapProps> = () => {
             !fromAsset ||
             !toAsset ||
             !sendAmount ||
+            !quote ||
+            !receiveAmount ||
             isLoading ||
             isQuoteLoading
           }
