@@ -198,7 +198,7 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-2">
                                                 <Image
-                                                    src="/avalanche-avax-logo.svg"
+                                                    src="https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png"
                                                     alt="avalanche"
                                                     width={32}
                                                     height={32}

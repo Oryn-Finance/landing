@@ -17,9 +17,7 @@ interface ConnectWalletModalProps {
   loadingBTC: boolean;
 }
 
-// Map wallet names to their icons for EVM and BTC wallets
 const WALLET_ICONS: Record<string, string> = {
-  injected: "https://garden-finance.imgix.net/wallets/metamask.svg",
   metamask: "https://garden-finance.imgix.net/wallets/metamask.svg",
   core: "https://build.avax.network/images/core.svg",
   phantom: "https://garden-finance.imgix.net/wallets/phantomDark.svg",

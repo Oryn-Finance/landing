@@ -14,10 +14,10 @@ interface OrdersSidebarProps {
 }
 
 const ASSET_LOGOS: Record<string, string> = {
-  wbtc: "https://garden.imgix.net/token-images/wbtc.svg",
-  avax: "https://garden.imgix.net/token-images/avax.svg",
-  usdc: "https://garden.imgix.net/token-images/usdc.svg",
-  bitcoin: "https://garden.imgix.net/token-images/bitcoin.svg",
+  wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
+  avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
+  bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
 };
 
 function getAssetLogo(symbol: string) {

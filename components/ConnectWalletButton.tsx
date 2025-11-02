@@ -161,7 +161,7 @@ export function ConnectWalletButton({ onOrdersClick, onWalletsClick }: ConnectWa
                                     className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-indigo-100 text-indigo-700 rounded-lg text-xs md:text-sm font-medium"
                                 >
                                     <Image
-                                        src="/avalanche-avax-logo.svg"
+                                        src="https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png"
                                         alt="avalanche"
                                         width={20}
                                         height={20}
