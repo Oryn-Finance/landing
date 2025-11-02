@@ -115,34 +115,62 @@ export const AssetDropdown: React.FC<{
     <div className="relative w-fit" ref={dropdownRef}>
       <button
         onClick={onToggle}
-        className="flex items-center justify-between gap-2 px-0 py-2 bg-transparent border-0 hover:opacity-80 focus:outline-none transition-opacity"
+        className="flex items-center justify-between gap-2 px-0 py-2 bg-transparent border-0 hover:opacity-80 focus:outline-none transition-opacity cursor-pointer"
       >
-        <div className="flex items-center gap-3 cursor-pointer h-12 overflow-hidden">
+        <div className="flex items-center gap-2 md:gap-3 h-12 overflow-hidden">
           {selectedAsset ? (
             <>
-              {/* Asset logo (bigger) with chain logo (smaller) as badge */}
-              <div className="relative flex items-center">
+              <div className="relative flex items-center flex-shrink-0">
                 {getAssetLogo(selectedAsset.asset.symbol, "lg")}
                 <div className="absolute -bottom-1 -right-1">
                   {getChainLogo(selectedAsset.chainName, "sm")}
                 </div>
               </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-gray-900 text-lg leading-tight">
+              <div className="flex flex-col min-w-0">
+                <span className="font-semibold text-gray-900 text-base md:text-lg leading-tight truncate">
                   {selectedAsset.asset.symbol}
                 </span>
               </div>
             </>
           ) : (
-            <span className="text-gray-400 font-medium text-lg">
-              Select asset
+            <span
+              className="relative inline-block font-medium text-base md:text-lg p-2 md:p-[6px] group/select"
+              onMouseEnter={(e) => {
+                const gradientText = (e.currentTarget as HTMLElement).querySelector('.gradient-text') as HTMLElement;
+                if (gradientText) {
+                  // Reveal diagonally from top-left corner expanding to bottom-right
+                  gradientText.style.clipPath = "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                const gradientText = (e.currentTarget as HTMLElement).querySelector('.gradient-text') as HTMLElement;
+                if (gradientText) {
+                  // Hide diagonally collapsing from bottom-right corner to top-left
+                  gradientText.style.clipPath = "polygon(100% 100%, 100% 100%, 100% 100%, 100% 100%)";
+                }
+              }}
+            >
+              <span className="relative z-10 text-gray-400">Select asset</span>
+              <span
+                className="absolute inset-0 p-2 md:p-[6px] gradient-text"
+                style={{
+                  // Start as a tiny triangle at top-left corner (0% revealed)
+                  clipPath: "polygon(0% 0%, 0% 0%, 0% 0%, 0% 0%)",
+                  transition: "clip-path 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                  background: "linear-gradient(to bottom right, #4c1d95, #1e1b4b, #4c1d95)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                Select asset
+              </span>
             </span>
           )}
         </div>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isOpen ? "rotate-180" : ""
+            }`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -163,7 +191,7 @@ export const AssetDropdown: React.FC<{
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.18 }}
-            className="absolute z-20 w-fit min-w-64 max-w-80 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-y-auto"
+            className="absolute z-20 w-fit min-w-64 max-w-80 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-y-auto left-0"
           >
             {getFilteredAssets(type).length === 0 ? (
               <div className="p-6 text-center text-gray-400 text-base font-medium">

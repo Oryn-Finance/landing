@@ -224,7 +224,6 @@ export default function Home() {
           <div className="flex justify-between items-center h-20">
             <motion.div
               className="flex items-center gap-2 cursor-pointer"
-              whileHover={{ scale: 1.05 }}
             >
               <Image
                 src="/Oryn.svg"

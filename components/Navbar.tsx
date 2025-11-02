@@ -27,7 +27,6 @@ export function Navbar({ onOrdersClick }: NavbarProps = {}) {
             <Link href="/">
               <motion.div
                 className="flex items-center gap-1.5 md:gap-2 cursor-pointer"
-                whileHover={{ scale: 1.05 }}
               >
                 <Image
                   src="/Oryn.svg"

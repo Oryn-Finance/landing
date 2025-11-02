@@ -57,7 +57,6 @@ interface AssetsState {
   quoteDebounceTimer: NodeJS.Timeout | null;
   showHero: boolean;
 
-  // Actions
   fetchAssets: () => Promise<void>;
   setFromAsset: (asset: AssetOption | null) => void;
   setToAsset: (asset: AssetOption | null) => void;
@@ -68,11 +67,10 @@ interface AssetsState {
   clearError: () => void;
   setShowHero: (show: boolean) => void;
   resetSwapState: () => void;
+  createOrder: (sourceRecipient: string, destinationRecipient: string) => Promise<void>;
 }
 
-// Helper to get the canonical asset key for backend (e.g., 'bitcoin' for BTC, 'avax' for AVAX, etc.)
 function getAssetKeyFromSymbol(symbol: string): string {
-  // Add mappings as needed
   const map: Record<string, string> = {
     btc: "bitcoin",
     avax: "avax",
@@ -82,41 +80,32 @@ function getAssetKeyFromSymbol(symbol: string): string {
   return map[symbol.toLowerCase()] || symbol.toLowerCase();
 }
 
-// Helper to map chain ID to backend format
-function mapChainIdToBackendFormat(chainId: string): string {
-  const chainIdLower = chainId.toLowerCase().trim();
-
-  // If already in correct format, return as-is
-  if (chainIdLower === "bitcoin_testnet") {
-    return "bitcoin_testnet";
-  }
-
-  if (chainIdLower === "arbitrum_sepolia") {
-    return "arbitrum_sepolia";
-  }
-
-  // Map Bitcoin chain IDs to bitcoin_testnet
-  if (chainIdLower === "bitcoin" || chainIdLower.includes("bitcoin testnet")) {
-    return "bitcoin_testnet";
-  }
-
-  // Map Arbitrum Sepolia variations
-  if (chainIdLower.includes("arbitrum") && chainIdLower.includes("sepolia")) {
-    return "arbitrum_sepolia";
-  }
-
-  // Return as-is for other chains
-  return chainId;
+function formatChainIdForBackend(chainId: string): string {
+  // Convert chain ID to backend format: lowercase and replace spaces with underscores
+  return chainId.toLowerCase().replace(/\s+/g, "_");
 }
 
-// Helper to build the correct value for backend param (chainId:assetKey)
 function buildBackendAssetValue(chainId: string, asset: Asset): string {
-  const mappedChainId = mapChainIdToBackendFormat(chainId);
+  const formattedChainId = formatChainIdForBackend(chainId);
   const assetKey = getAssetKeyFromSymbol(asset.symbol);
-  return `${mappedChainId}:${assetKey}`;
+  return `${formattedChainId}:${assetKey}`;
 }
 
-// Debounce helper
+async function generateCommitmentHash(orderData: {
+  sourceAsset: string;
+  sourceAmount: string;
+  destinationAsset: string;
+  destinationAmount: string;
+}): Promise<string> {
+  // Generate a commitment hash from order data
+  const dataString = JSON.stringify(orderData);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(dataString);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   delay: number
@@ -148,14 +137,13 @@ export const useAssetsStore = create<AssetsState>()(
         try {
           set({ isLoading: true, error: null });
 
-          // Construct URL properly (handle trailing slash)
           const baseUrl = API_URLS.QUOTE.endsWith("/")
             ? API_URLS.QUOTE.slice(0, -1)
             : API_URLS.QUOTE;
           const url = `${baseUrl}/chains`;
 
           const response = await axios.get(url, {
-            timeout: 10000, // 10 second timeout
+            timeout: 10000,
             headers: {
               "Content-Type": "application/json",
             },
@@ -170,7 +158,6 @@ export const useAssetsStore = create<AssetsState>()(
                 chainId: chain.id,
                 chainName: chain.name,
                 asset,
-                // For dropdown, keep value as chainId:assetSymbol for display, but backend param will be built dynamically
                 value: `${chain.id}:${asset.symbol}`,
               });
             });
@@ -179,7 +166,6 @@ export const useAssetsStore = create<AssetsState>()(
         } catch (error) {
           console.error("Failed to fetch assets:", error);
 
-          // Provide fallback mock data for landing page demo
           const mockAssets: AssetOption[] = [
             {
               chainId: "bitcoin",
@@ -271,7 +257,6 @@ export const useAssetsStore = create<AssetsState>()(
 
         // Validate numeric input (allows decimals including "0.0", "0.00", etc.)
         const numAmount = parseFloat(amount);
-        // Check if it's a valid number (including decimals) and not negative
         if (!isNaN(numAmount) && numAmount >= 0) {
           // Ensure decimal places don't exceed 6
           const parts = amount.split(".");
@@ -294,7 +279,6 @@ export const useAssetsStore = create<AssetsState>()(
               quote: null,
               receiveAmount: "",
               receiveValue: "",
-              sendValue: "",
             });
           }
         }
@@ -338,7 +322,6 @@ export const useAssetsStore = create<AssetsState>()(
           set({
             quote: null,
             receiveAmount: "",
-            sendValue: "",
             receiveValue: "",
             isQuoteLoading: false,
           });
@@ -348,12 +331,10 @@ export const useAssetsStore = create<AssetsState>()(
         try {
           set({ isQuoteLoading: true, error: null });
 
-          // Format amount based on decimals
           const formattedAmount = BigInt(
             numAmount * Math.pow(10, fromAsset.asset.decimals)
           ).toString();
 
-          // Build correct backend param for 'from' and 'to'
           const fromParam = buildBackendAssetValue(
             fromAsset.chainId,
             fromAsset.asset
@@ -363,7 +344,6 @@ export const useAssetsStore = create<AssetsState>()(
             toAsset.asset
           );
 
-          // Construct URL properly (handle trailing slash)
           const baseUrl = API_URLS.QUOTE.endsWith("/")
             ? API_URLS.QUOTE.slice(0, -1)
             : API_URLS.QUOTE;
@@ -383,7 +363,6 @@ export const useAssetsStore = create<AssetsState>()(
             Array.isArray(response.data.result) &&
             response.data.result.length > 0
           ) {
-            // Use the new quote response format
             const quoteResult = response.data.result[0];
             // Format receiveAmount to max 6 decimal places
             const receiveAmountNum = parseFloat(
@@ -410,21 +389,19 @@ export const useAssetsStore = create<AssetsState>()(
         } catch (error) {
           console.error("Failed to get quote:", error);
 
-          // For landing page demo: provide mock quote if API fails
-          // In production, you might want to just set an error state
           const mockReceiveAmount = "";
           const mockReceiveValue = "";
-          const mockSendValue = (parseFloat(sendAmount) * 111116.62).toFixed(2);
+          const { sendValue: currentSendValue } = get();
           set({
             error: "Using demo quote (API unavailable)",
             receiveAmount: mockReceiveAmount,
-            sendValue: mockSendValue,
+            sendValue: currentSendValue,
             receiveValue: mockReceiveValue,
             isQuoteLoading: false,
             quote: null,
           });
         }
-      }, 500), // 500ms debounce
+      }, 500),
 
       getQuote: async () => {
         const { fromAsset, toAsset, sendAmount } = get();
@@ -459,7 +436,6 @@ export const useAssetsStore = create<AssetsState>()(
             numAmount * Math.pow(10, fromAsset.asset.decimals)
           ).toString();
 
-          // Build correct backend param for 'from' and 'to'
           const fromParam = buildBackendAssetValue(
             fromAsset.chainId,
             fromAsset.asset
@@ -469,7 +445,6 @@ export const useAssetsStore = create<AssetsState>()(
             toAsset.asset
           );
 
-          // Construct URL properly (handle trailing slash)
           const baseUrl = API_URLS.QUOTE.endsWith("/")
             ? API_URLS.QUOTE.slice(0, -1)
             : API_URLS.QUOTE;
@@ -489,7 +464,6 @@ export const useAssetsStore = create<AssetsState>()(
             Array.isArray(response.data.result) &&
             response.data.result.length > 0
           ) {
-            // Use the new quote response format
             const quoteResult = response.data.result[0];
             // Format receiveAmount to max 6 decimal places
             const receiveAmountNum = parseFloat(
@@ -549,6 +523,79 @@ export const useAssetsStore = create<AssetsState>()(
           quote: null,
           error: null,
         }),
+
+      createOrder: async (sourceRecipient: string, destinationRecipient: string) => {
+        const { fromAsset, toAsset, sendAmount, quote } = get();
+
+        if (!fromAsset || !toAsset || !sendAmount || !quote || !quote.result?.[0]) {
+          throw new Error("Missing required order data");
+        }
+
+        try {
+          set({ isLoading: true, error: null });
+
+          // Convert source amount to smallest units
+          const sourceAmountNum = parseFloat(sendAmount);
+          if (isNaN(sourceAmountNum) || sourceAmountNum <= 0) {
+            throw new Error("Invalid source amount");
+          }
+
+          const sourceAmountInSmallestUnits = BigInt(
+            Math.floor(sourceAmountNum * Math.pow(10, fromAsset.asset.decimals))
+          ).toString();
+
+          // Destination amount from quote is already in smallest units
+          const destinationAmountInSmallestUnits = quote.result[0].destination.amount;
+
+          // Format asset identifiers
+          const sourceAsset = buildBackendAssetValue(fromAsset.chainId, fromAsset.asset);
+          const destinationAsset = buildBackendAssetValue(toAsset.chainId, toAsset.asset);
+
+          // Generate commitment hash
+          const commitmentHash = await generateCommitmentHash({
+            sourceAsset,
+            sourceAmount: sourceAmountInSmallestUnits,
+            destinationAsset,
+            destinationAmount: destinationAmountInSmallestUnits,
+          });
+
+          const orderPayload = {
+            source: {
+              asset: sourceAsset,
+              recipient: sourceRecipient,
+              amount: sourceAmountInSmallestUnits,
+            },
+            destination: {
+              asset: destinationAsset,
+              recipient: destinationRecipient,
+              amount: destinationAmountInSmallestUnits,
+            },
+            commitment_hash: commitmentHash,
+          };
+
+          const baseUrl = API_URLS.ORDERS.endsWith("/")
+            ? API_URLS.ORDERS.slice(0, -1)
+            : API_URLS.ORDERS;
+          const url = `${baseUrl}/orders`;
+
+          const response = await axios.post(url, orderPayload, {
+            timeout: 30000,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          set({ isLoading: false });
+          return response.data;
+        } catch (error) {
+          console.error("Failed to create order:", error);
+          set({
+            error: error instanceof Error ? error.message : "Failed to create order",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
     }),
     {
       name: "assets-store",
