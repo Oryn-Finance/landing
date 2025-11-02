@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAssetsStore, type AssetOption } from "../store/assetsStore";
+import Image from "next/image";
 
 // Asset and chain logo URLs
 const ASSET_LOGOS: Record<string, string> = {
@@ -32,10 +33,12 @@ function getAssetLogo(symbol: string) {
 
   if (url) {
     return (
-      <img
+      <Image
         src={url}
         alt={symbol}
         className="w-6 h-6 rounded-full object-contain"
+        height={1000}
+        width={1000}
         style={{ background: "#fff" }}
       />
     );

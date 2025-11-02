@@ -72,32 +72,11 @@ export default function SwapPage() {
           transition={{ duration: 0.6 }}
           className="w-full max-w-2xl"
         >
-          <div className="text-center mb-4 xs:mb-6 md:mb-8">
-            <motion.h1
-              className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-light text-gray-900 mb-2 md:mb-3 tracking-tight"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              <span className="block mb-1 md:mb-2">Bridge Your Assets</span>
-              <span className="font-medium bg-gradient-to-r from-purple-600 via-pink-500 to-blue-600 bg-clip-text text-transparent">
-                Fast & Secure
-              </span>
-            </motion.h1>
-            <motion.p
-              className="text-xs xs:text-sm sm:text-base md:text-lg text-gray-600 font-light px-2"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              Swap assets between Bitcoin and any EVM chain in 30 seconds
-            </motion.p>
-          </div>
-
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
+            className="scale-90 origin-top"
           >
             <Swap />
           </motion.div>
@@ -113,4 +92,3 @@ export default function SwapPage() {
     </div>
   );
 }
-
