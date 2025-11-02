@@ -109,30 +109,29 @@ export const AssetDropdown: React.FC<{
         onClick={onToggle}
         className="flex items-center justify-between gap-2 px-0 py-2 bg-transparent border-0 hover:opacity-80 focus:outline-none transition-opacity"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {selectedAsset ? (
             <>
-              {/* Asset logo (bigger) with chain logo (smaller) as badge */}
-              <div className="relative flex items-center">
+              <div className="relative flex items-center flex-shrink-0">
                 {getAssetLogo(selectedAsset.asset.symbol, "lg")}
                 <div className="absolute -bottom-1 -right-1">
                   {getChainLogo(selectedAsset.chainName, "sm")}
                 </div>
               </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-gray-900 text-lg leading-tight">
+              <div className="flex flex-col min-w-0">
+                <span className="font-semibold text-gray-900 text-base md:text-lg leading-tight truncate">
                   {selectedAsset.asset.symbol}
                 </span>
               </div>
             </>
           ) : (
-            <span className="text-gray-400 font-medium text-lg">
+            <span className="text-gray-400 font-medium text-base md:text-lg p-2 md:p-[6px]">
               Select asset
             </span>
           )}
         </div>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isOpen ? "rotate-180" : ""
             }`}
           fill="none"
           stroke="currentColor"
@@ -154,7 +153,7 @@ export const AssetDropdown: React.FC<{
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
             transition={{ duration: 0.18 }}
-            className="absolute z-20 w-fit min-w-64 max-w-80 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-y-auto"
+            className="absolute z-20 w-fit min-w-64 max-w-80 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-y-auto left-0"
           >
             {getFilteredAssets(type).length === 0 ? (
               <div className="p-6 text-center text-gray-400 text-base font-medium">
