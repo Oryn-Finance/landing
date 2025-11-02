@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { AssetDropdown } from "./AssetDropdown";
 import SlideToConfirmButton from "./SlideToConfirmButton";
 import { useAssetsStore } from "../store/assetsStore";
+import { AlertCircle } from "lucide-react";
 
 interface SwapProps {
   onOrderCreated?: (orderId: string) => void;
@@ -45,7 +46,7 @@ const Swap: React.FC<SwapProps> = () => {
   };
 
   return (
-    <div className="mx-auto p-6 max-w-2xl min-w-xl w-full">
+    <div className="mx-auto p-6 max-w-2xl w-full overflow-x-hidden md:overflow-x-visible">
       <div className="relative w-full flex items-center flex-col rounded-3xl p-6">
         {/* From Asset */}
         <div className="w-full">
@@ -58,17 +59,19 @@ const Swap: React.FC<SwapProps> = () => {
             <label className="block text-2xl font-medium text-gray-700 mb-2">
               You Pay
             </label>
-            <div className="w-full justify-between gap-2 flex items-center">
-              <AssetDropdown
-                type="from"
-                selectedAsset={fromAsset}
-                isOpen={isDropdownOpen === "from"}
-                onToggle={() =>
-                  setIsDropdownOpen(isDropdownOpen === "from" ? null : "from")
-                }
-                onSelect={(asset) => handleAssetSelect(asset, "from")}
-              />
-              <div className="relative w-1/2">
+            <div className="w-full justify-between gap-2 flex items-center flex-wrap md:flex-nowrap">
+              <div className="w-full md:flex-initial md:flex-1 min-w-0">
+                <AssetDropdown
+                  type="from"
+                  selectedAsset={fromAsset}
+                  isOpen={isDropdownOpen === "from"}
+                  onToggle={() =>
+                    setIsDropdownOpen(isDropdownOpen === "from" ? null : "from")
+                  }
+                  onSelect={(asset) => handleAssetSelect(asset, "from")}
+                />
+              </div>
+              <div className="relative w-full md:w-1/2 min-w-0">
                 <input
                   inputMode="decimal"
                   pattern="[0-9]*[.,]?[0-9]*"
@@ -89,7 +92,7 @@ const Swap: React.FC<SwapProps> = () => {
           </div>
         </div>
 
-        <div className="flex -my-2 top-48 w-full items-center absolute justify-center z-10">
+        <div className="flex -my-2 w-full items-center absolute justify-center z-10 left-0" style={{ top: 'calc(50% - 3rem)' }}>
           <motion.button
             whileHover={{ scale: 1, rotate: 180 }}
             whileTap={{ scale: 0.95 }}
@@ -121,17 +124,19 @@ const Swap: React.FC<SwapProps> = () => {
             <label className="block text-2xl font-medium text-gray-700 mb-2">
               You Receive
             </label>
-            <div className="w-full flex items-center justify-between gap-2">
-              <AssetDropdown
-                type="to"
-                selectedAsset={toAsset}
-                isOpen={isDropdownOpen === "to"}
-                onToggle={() =>
-                  setIsDropdownOpen(isDropdownOpen === "to" ? null : "to")
-                }
-                onSelect={(asset) => handleAssetSelect(asset, "to")}
-              />
-              <div className="relative w-1/2">
+            <div className="w-full flex items-center justify-between gap-2 flex-wrap md:flex-nowrap">
+              <div className="w-full md:flex-initial md:flex-1 min-w-0">
+                <AssetDropdown
+                  type="to"
+                  selectedAsset={toAsset}
+                  isOpen={isDropdownOpen === "to"}
+                  onToggle={() =>
+                    setIsDropdownOpen(isDropdownOpen === "to" ? null : "to")
+                  }
+                  onSelect={(asset) => handleAssetSelect(asset, "to")}
+                />
+              </div>
+              <div className="relative w-full md:w-1/2 min-w-0">
                 <input
                   type="number"
                   placeholder="0.0"
@@ -154,23 +159,34 @@ const Swap: React.FC<SwapProps> = () => {
             className="w-full h-10 -mt-1"
           />
         </div>
+
         {/* Bridge Button */}
         <SlideToConfirmButton
           disabled={
-            !fromAsset || !toAsset || !sendAmount || isLoading || isQuoteLoading
+            !fromAsset ||
+            !toAsset ||
+            !sendAmount ||
+            isLoading ||
+            isQuoteLoading
           }
-          isLoading={false}
+          isLoading={isLoading || isQuoteLoading}
           loadingText={
             isLoading
               ? "Loading Assets..."
               : isQuoteLoading
-              ? "Getting Quote..."
-              : "Redirecting..."
+                ? "Getting Quote..."
+                : "Processing..."
           }
-          confirmText="Go to App"
+          confirmText="Confirm Swap"
           onConfirm={() => {
-            // TODO: Replace with actual app URL when ready
-            window.location.href = "https://random.url";
+            // Handle swap confirmation here
+            console.log("Swap confirmed:", {
+              fromAsset,
+              toAsset,
+              sendAmount,
+              receiveAmount,
+            });
+            // TODO: Implement actual swap logic
           }}
         />
       </div>
