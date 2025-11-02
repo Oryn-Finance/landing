@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useInView } from "react-intersection-observer";
+import Image from "next/image";
+import Link from "next/link";
 import {
   Zap,
   Shield,
@@ -16,14 +18,12 @@ import {
   Layers,
   Sparkles,
   Network,
-  Wallet,
   Coins,
   ShieldCheck,
   Activity,
   Globe2,
 } from "lucide-react";
 import Swap from "../components/Swap";
-import Link from "next/link";
 
 function FloatingParticles() {
   const [particleData, setParticleData] = useState<
@@ -38,14 +38,44 @@ function FloatingParticles() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const particles = Array.from({ length: 15 }).map(() => ({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        duration: Math.random() * 10 + 10,
-        targetX: Math.random() * window.innerWidth,
-        targetY: Math.random() * window.innerHeight,
-      }));
-      setParticleData(particles);
+      const updateParticles = () => {
+        // Add padding to keep particles within visible bounds
+        const padding = 50;
+        const maxX = window.innerWidth - padding;
+        const maxY = window.innerHeight - padding;
+
+        const particles = Array.from({ length: 15 }).map(() => {
+          const startX = padding + Math.random() * maxX;
+          const startY = padding + Math.random() * maxY;
+
+          // Generate target position within bounds, not too far from start
+          const maxDistance = 200;
+          const angle = Math.random() * Math.PI * 2;
+          const distance = Math.random() * maxDistance;
+
+          let targetX = startX + Math.cos(angle) * distance;
+          let targetY = startY + Math.sin(angle) * distance;
+
+          // Clamp to bounds
+          targetX = Math.max(padding, Math.min(maxX, targetX));
+          targetY = Math.max(padding, Math.min(maxY, targetY));
+
+          return {
+            x: startX,
+            y: startY,
+            duration: Math.random() * 10 + 10,
+            targetX,
+            targetY,
+          };
+        });
+        setParticleData(particles);
+      };
+
+      updateParticles();
+
+      // Update on resize
+      window.addEventListener("resize", updateParticles);
+      return () => window.removeEventListener("resize", updateParticles);
     }
   }, []);
 
@@ -55,18 +85,23 @@ function FloatingParticles() {
         <motion.div
           key={i}
           className="absolute w-1.5 h-1.5 bg-purple-300 rounded-full opacity-20"
+          style={{
+            left: 0,
+            top: 0,
+          }}
           initial={{
             x: particle.x,
             y: particle.y,
           }}
           animate={{
-            y: particle.targetY,
             x: particle.targetX,
+            y: particle.targetY,
             opacity: [0.1, 0.3, 0.1],
           }}
           transition={{
             duration: particle.duration,
             repeat: Infinity,
+            repeatType: "reverse",
             ease: "easeInOut",
           }}
         />
@@ -102,80 +137,6 @@ function AnimatedGradientOrb() {
           }}
         />
         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-100/30 to-blue-100/30 blur-2xl" />
-      </motion.div>
-    </div>
-  );
-}
-
-function AnimatedNetworkSphere() {
-  const [nodeData, setNodeData] = useState<
-    Array<{ y: number; duration: number }>
-  >([]);
-
-  useEffect(() => {
-    const nodes = Array.from({ length: 50 }).map(() => ({
-      y: (Math.random() - 0.5) * 100,
-      duration: 2 + Math.random() * 2,
-    }));
-    setNodeData(nodes);
-  }, []);
-
-  return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      <motion.div
-        className="relative w-[400px] h-[400px]"
-        animate={{
-          rotateY: [0, 360],
-          rotateX: [0, 180],
-        }}
-        transition={{
-          duration: 30,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-        style={{
-          transformStyle: "preserve-3d",
-        }}
-      >
-        {nodeData.map((node, i) => {
-          const angle = (i / nodeData.length) * Math.PI * 2;
-          const radius = 150;
-          const x = Math.cos(angle) * radius;
-          const z = Math.sin(angle) * radius;
-
-          return (
-            <motion.div
-              key={i}
-              className="absolute w-3 h-3 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full"
-              initial={{ x: 0, y: 0, z: 0 }}
-              animate={{
-                x: x,
-                y: node.y,
-                z: z,
-                scale: [1, 1.5, 1],
-                opacity: [0.5, 1, 0.5],
-              }}
-              transition={{
-                duration: node.duration,
-                repeat: Infinity,
-                delay: i * 0.1,
-              }}
-              style={{
-                transform: `translate3d(${x}px, ${node.y}px, ${z}px)`,
-              }}
-            />
-          );
-        })}
-        <motion.div
-          className="absolute inset-0 rounded-full border border-purple-400/20"
-          animate={{
-            opacity: [0.2, 0.5, 0.2],
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-          }}
-        />
       </motion.div>
     </div>
   );
@@ -249,55 +210,9 @@ function FeatureCard({
   );
 }
 
-function StatCard({
-  value,
-  label,
-  delay = 0,
-}: {
-  value: string;
-  label: string;
-  delay?: number;
-}) {
-  const [ref, inView] = useInView({
-    triggerOnce: true,
-    threshold: 0.2,
-  });
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={inView ? { opacity: 1, scale: 1 } : {}}
-      transition={{ duration: 0.6, delay, type: "spring" }}
-      className="text-center"
-    >
-      <motion.div
-        className="text-5xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2"
-        animate={inView ? { scale: [1, 1.1, 1] } : {}}
-        transition={{ duration: 0.6, delay }}
-      >
-        {value}
-      </motion.div>
-      <div className="text-gray-600 font-medium">{label}</div>
-      <motion.div
-        className="w-16 h-0.5 bg-gradient-to-r from-purple-600 to-blue-600 mx-auto mt-4"
-        initial={{ width: 0 }}
-        animate={inView ? { width: 64 } : {}}
-        transition={{ duration: 0.8, delay: delay + 0.2 }}
-      />
-    </motion.div>
-  );
-}
-
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 text-gray-900 overflow-hidden">
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-blue-50/80" />
-        <AnimatedGradientOrb />
-        <FloatingParticles />
-      </div>
-
       {/* Navigation */}
       <motion.nav
         initial={{ y: -100, opacity: 0 }}
@@ -308,14 +223,23 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <motion.div
-              className="flex items-center gap-2 text-2xl font-bold cursor-pointer"
+              className="flex items-center gap-2 cursor-pointer"
+              whileHover={{ scale: 1.05 }}
             >
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-                <Bitcoin className="w-6 h-6 text-white" />
-              </div>
-              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                AVAX Bridge
-              </span>
+              <Image
+                src="/Oryn.svg"
+                alt="Oryn Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10"
+              />
+              <Image
+                src="/OrynTypo.svg"
+                alt="Oryn"
+                width={120}
+                height={40}
+                className="h-8 w-auto"
+              />
             </motion.div>
             <div className="flex gap-4 items-center">
               <motion.button
@@ -395,8 +319,11 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.5 }}
               >
-                Swap assets between Bitcoin and any EVM chain securely in 30
-                seconds. Trustless, non-custodial, powered by HTLC atomic swaps.
+                Oryn is the first cross-chain bridge using HTLC atomic swaps and
+                UDP protocol to connect Bitcoin with EVM chains in 30 seconds.
+                Deposit to your account—no wallet connection or approvals
+                needed. Built for the future of DeFi—faster, safer, and more
+                decentralized than traditional bridges.
               </motion.p>
 
               <motion.div
@@ -435,7 +362,7 @@ export default function Home() {
 
             {/* Right Column - Swap Component */}
             <motion.div
-              className="relative w-full max-w-2xl"
+              className="relative w-full max-w-2xl scale-80"
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
@@ -510,7 +437,7 @@ export default function Home() {
             <FeatureCard
               icon={Rocket}
               title="One-Click Swaps"
-              description="Zero approvals needed. Simple, intuitive interface for seamless cross-chain transactions."
+              description="Deposit-based swaps with no wallet connection or approvals. Simple, fast, and secure."
               delay={0.3}
             />
           </div>
@@ -564,8 +491,8 @@ export default function Home() {
               },
               {
                 icon: Sparkles,
-                title: "Zero Approvals",
-                desc: "Streamlined UX—no endless approval requests",
+                title: "No Approvals Needed",
+                desc: "Deposit-based model—no wallet approvals or connection requirements",
               },
             ].map((feature, index) => (
               <FeatureCard
@@ -602,21 +529,21 @@ export default function Home() {
             {[
               {
                 step: "1",
-                icon: Wallet,
-                title: "Connect Wallet",
-                desc: "Connect your Bitcoin and EVM wallets in seconds",
+                icon: Coins,
+                title: "Deposit to Account",
+                desc: "Deposit your assets into your account—no wallet connection or approvals needed",
               },
               {
                 step: "2",
-                icon: Coins,
-                title: "Select Assets",
-                desc: "Choose your source and destination chains and assets",
+                icon: Zap,
+                title: "Select Swap Details",
+                desc: "Choose your source and destination chains and assets for instant swapping",
               },
               {
                 step: "3",
-                icon: Zap,
-                title: "Swap Instantly",
-                desc: "Complete your swap in 30 seconds—no waiting, no trust needed",
+                icon: Rocket,
+                title: "Receive Directly",
+                desc: "We send your swapped assets directly to your destination—complete in 30 seconds",
               },
             ].map((step, index) => (
               <motion.div
@@ -807,8 +734,8 @@ export default function Home() {
               },
               {
                 icon: Shield,
-                title: "Non-Custodial Design",
-                desc: "Your funds never leave your wallet. No third-party custody, no counterparty risk.",
+                title: "Secure Account Model",
+                desc: "Deposit to your account and receive swapped assets directly. Secure, fast, and trustless execution.",
               },
               {
                 icon: Activity,
@@ -828,8 +755,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Performance Metrics */}
-      <section className="relative py-24 px-4 sm:px-6 lg:px-8 z-10">
+      {/* Performance Metrics & Business KPIs */}
+      <section className="relative py-24 px-4 sm:px-6 lg:px-8 z-10 bg-white/30">
         <div className="max-w-7xl mx-auto">
           <motion.div
             className="text-center mb-12"
@@ -839,19 +766,39 @@ export default function Home() {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-4xl sm:text-5xl font-light mb-3 text-gray-900 tracking-tight">
-              Performance Metrics
+              Performance Metrics & KPIs
             </h2>
             <p className="text-lg text-gray-500 font-light">
-              Real numbers that matter
+              Track record and growth metrics
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-4 gap-5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
             {[
-              { value: "30s", label: "Average Swap Time", icon: Clock },
-              { value: "99.9%", label: "Success Rate", icon: CheckCircle2 },
-              { value: "$0", label: "Custodial Risk", icon: Lock },
-              { value: "1", label: "Click to Swap", icon: Rocket },
+              {
+                value: "30s",
+                label: "Average Swap Time",
+                icon: Clock,
+                desc: "60x faster than competitors",
+              },
+              {
+                value: "99.9%",
+                label: "Success Rate",
+                icon: CheckCircle2,
+                desc: "Highest in industry",
+              },
+              {
+                value: "$0",
+                label: "Custodial Risk",
+                icon: Lock,
+                desc: "Zero hack exposure",
+              },
+              {
+                value: "1",
+                label: "Click to Swap",
+                icon: Rocket,
+                desc: "Simplest UX",
+              },
             ].map((metric, index) => (
               <motion.div
                 key={index}
@@ -879,9 +826,67 @@ export default function Home() {
                   <motion.div className="text-4xl font-medium bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-1.5">
                     {metric.value}
                   </motion.div>
-                  <div className="text-sm text-gray-500 font-medium">
+                  <div className="text-sm text-gray-900 font-medium mb-1">
                     {metric.label}
                   </div>
+                  <div className="text-xs text-gray-500">{metric.desc}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                title: "Target Metrics",
+                metrics: [
+                  { label: "Monthly Active Users", value: "10K+ (Q1 2025)" },
+                  { label: "Transaction Volume", value: "$50M+ monthly" },
+                  { label: "Revenue Target", value: "$500K+ monthly" },
+                ],
+              },
+              {
+                title: "Growth Projections",
+                metrics: [
+                  { label: "Year 1", value: "$5M+ TVL" },
+                  { label: "Year 2", value: "$50M+ TVL" },
+                  { label: "Year 3", value: "$200M+ TVL" },
+                ],
+              },
+              {
+                title: "Market Position",
+                metrics: [
+                  { label: "Competitive Advantage", value: "60x faster swaps" },
+                  { label: "Security Advantage", value: "Zero custodial risk" },
+                  { label: "Market Share Goal", value: "5% by 2026" },
+                ],
+              },
+            ].map((section, index) => (
+              <motion.div
+                key={index}
+                className="bg-white/70 backdrop-blur-sm border border-gray-100/60 p-6 rounded-xl"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+              >
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  {section.title}
+                </h3>
+                <div className="space-y-3">
+                  {section.metrics.map((metric, mIndex) => (
+                    <div
+                      key={mIndex}
+                      className="flex justify-between items-start border-b border-gray-100/60 pb-3 last:border-0"
+                    >
+                      <div className="text-sm text-gray-600">
+                        {metric.label}
+                      </div>
+                      <div className="text-sm font-medium text-purple-600 text-right">
+                        {metric.value}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             ))}
@@ -889,7 +894,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Technology Highlights */}
+      {/* Technology & Architecture */}
       <section className="relative py-24 px-4 sm:px-6 lg:px-8 z-10 bg-white/30">
         <div className="max-w-7xl mx-auto">
           <motion.div
@@ -900,51 +905,271 @@ export default function Home() {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-4xl sm:text-5xl font-light mb-3 text-gray-900 tracking-tight">
-              Technology Highlights
+              Technology & Architecture
             </h2>
             <p className="text-lg text-gray-500 font-light">
-              Cutting-edge tech stack powering the future of cross-chain swaps
+              Built on cryptographic guarantees, not trust
             </p>
           </motion.div>
 
+          <div className="grid lg:grid-cols-2 gap-8 mb-12">
+            <motion.div
+              className="bg-white/70 backdrop-blur-sm border border-gray-100/60 p-8 rounded-xl"
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <h3 className="text-2xl font-medium text-gray-900 mb-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg flex items-center justify-center border border-purple-100/50">
+                  <Layers className="w-5 h-5 text-purple-600" />
+                </div>
+                HTLC Atomic Swaps
+              </h3>
+              <p className="text-gray-600 leading-relaxed mb-4">
+                Hash Time-Locked Contracts ensure atomic execution—either the
+                entire swap completes or nothing happens. This eliminates
+                partial transaction risks and counterparty trust requirements.
+              </p>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                  <span>
+                    Cryptographically secure: No third-party intermediaries
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                  <span>
+                    Time-locked: Automatic refunds if conditions aren&apos;t met
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                  <span>
+                    Secure account model: Deposit and receive directly
+                  </span>
+                </li>
+              </ul>
+            </motion.div>
+
+            <motion.div
+              className="bg-white/70 backdrop-blur-sm border border-gray-100/60 p-8 rounded-xl"
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <h3 className="text-2xl font-medium text-gray-900 mb-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg flex items-center justify-center border border-purple-100/50">
+                  <Network className="w-5 h-5 text-purple-600" />
+                </div>
+                Technical Stack
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  "Bitcoin Script",
+                  "Solidity Smart Contracts",
+                  "Avalanche C-Chain",
+                  "UDP Protocol",
+                  "HTLC Atomic Swaps",
+                  "Optimized Routing",
+                ].map((tech, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 p-2 bg-white/50 rounded-lg border border-gray-100/50"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500" />
+                    <span className="text-xs text-gray-700 font-medium">
+                      {tech}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-gray-500 mt-4 leading-relaxed">
+                Our architecture combines Bitcoin&apos;s security with EVM chain
+                flexibility, enabling seamless cross-chain transactions without
+                compromising on decentralization.
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Business Model */}
+      <section className="relative py-24 px-4 sm:px-6 lg:px-8 z-10">
+        <div className="max-w-7xl mx-auto">
           <motion.div
-            className="bg-white/70 backdrop-blur-sm border border-gray-100/60 p-6 rounded-xl"
+            className="text-center mb-12"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
+            <h2 className="text-4xl sm:text-5xl font-light mb-3 text-gray-900 tracking-tight">
+              Business Model
+            </h2>
+            <p className="text-lg text-gray-500 font-light">
+              Sustainable revenue streams for long-term growth
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Coins,
+                title: "Transaction Fees",
+                desc: "Small, transparent fees (10 bips) per swap transaction. Competitive pricing drives volume while maintaining profitability.",
+              },
+              {
+                icon: TrendingUp,
+                title: "Enterprise Partnerships",
+                desc: "White-label solutions for DeFi protocols, exchanges, and financial institutions seeking reliable cross-chain infrastructure.",
+              },
+              {
+                icon: Network,
+                title: "Protocol Integrations",
+                desc: "Revenue sharing from partnerships with major DeFi protocols leveraging our bridge infrastructure for liquidity routing.",
+              },
+            ].map((model, index) => (
+              <FeatureCard
+                key={index}
+                icon={model.icon}
+                title={model.title}
+                description={model.desc}
+                delay={index * 0.1}
+              />
+            ))}
+          </div>
+
+          <motion.div
+            className="mt-12 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200/60 rounded-xl p-8"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="grid md:grid-cols-3 gap-6 text-center">
+              <div>
+                <div className="text-3xl font-medium text-purple-600 mb-2">
+                  Sustainable
+                </div>
+                <div className="text-sm text-gray-600">
+                  Fee-based model ensures long-term viability
+                </div>
+              </div>
+              <div>
+                <div className="text-3xl font-medium text-purple-600 mb-2">
+                  Scalable
+                </div>
+                <div className="text-sm text-gray-600">
+                  Revenue grows with transaction volume
+                </div>
+              </div>
+              <div>
+                <div className="text-3xl font-medium text-purple-600 mb-2">
+                  Transparent
+                </div>
+                <div className="text-sm text-gray-600">
+                  Clear fee structure, no hidden costs
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Market Opportunity */}
+      <section className="relative py-24 px-4 sm:px-6 lg:px-8 z-10 bg-white/30">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            className="text-center mb-12"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-4xl sm:text-5xl font-light mb-3 text-gray-900 tracking-tight">
+              Market Opportunity
+            </h2>
+            <p className="text-lg text-gray-500 font-light">
+              The cross-chain bridge market is rapidly expanding
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            {[
+              {
+                value: "$50B+",
+                label: "Total Value Locked (TVL) in Bridges",
+                desc: "Growing market with increasing adoption",
+              },
+              {
+                value: "500K+",
+                label: "Daily Bridge Transactions",
+                desc: "Massive user base seeking faster alternatives",
+              },
+              {
+                value: "40%",
+                label: "Annual Market Growth",
+                desc: "Exponential growth in cross-chain activity",
+              },
+            ].map((metric, index) => (
+              <motion.div
+                key={index}
+                className="bg-white/70 backdrop-blur-sm border border-gray-100/60 p-6 rounded-xl text-center"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+              >
+                <div className="text-4xl font-medium bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                  {metric.value}
+                </div>
+                <div className="text-base font-medium text-gray-900 mb-1">
+                  {metric.label}
+                </div>
+                <div className="text-sm text-gray-500">{metric.desc}</div>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div
+            className="bg-white/70 backdrop-blur-sm border border-gray-100/60 p-8 rounded-xl"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h3 className="text-xl font-medium text-gray-900 mb-4">Why Now?</h3>
             <div className="grid md:grid-cols-2 gap-4">
               {[
-                "HTLC (Hash Time-Locked Contracts)",
-                "Bitcoin Script Integration",
-                "EVM Smart Contracts",
-                "Zero-Knowledge Proofs",
-                "Optimized Cross-Chain Communication",
-                "Non-Custodial Architecture",
-              ].map((tech, index) => (
-                <motion.div
-                  key={index}
-                  className="flex items-center p-3 bg-white/50 rounded-lg border border-gray-100/50 hover:border-purple-200/80 hover:bg-white/80 transition-all"
-                  initial={{ opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.01 }}
-                >
-                  <motion.div
-                    className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 mr-3"
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      delay: index * 0.2,
-                    }}
-                  />
-                  <span className="text-sm text-gray-700 font-medium">
-                    {tech}
-                  </span>
-                </motion.div>
+                {
+                  title: "Bitcoin Adoption Rising",
+                  desc: "Institutional and retail Bitcoin adoption is at an all-time high. Users need efficient ways to move BTC to DeFi ecosystems.",
+                },
+                {
+                  title: "DeFi on EVM Chains",
+                  desc: "Ethereum, Avalanche, and other EVM chains host billions in DeFi TVL. Bridging Bitcoin enables new yield opportunities.",
+                },
+                {
+                  title: "Security Concerns",
+                  desc: "Multiple bridge hacks have highlighted the need for trustless, non-custodial solutions like HTLC atomic swaps.",
+                },
+                {
+                  title: "Speed Matters",
+                  desc: "Current bridges take 5-30 minutes. Our 30-second swaps address a critical pain point in the market.",
+                },
+              ].map((point, index) => (
+                <div key={index} className="flex gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 mt-2 shrink-0" />
+                  <div>
+                    <div className="font-medium text-gray-900 mb-1">
+                      {point.title}
+                    </div>
+                    <div className="text-sm text-gray-600">{point.desc}</div>
+                  </div>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -999,8 +1224,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Comparison Table */}
-      <section className="relative py-24 px-4 sm:px-6 lg:px-8 z-10 bg-white/30">
+      {/* Competitive Analysis */}
+      <section className="relative py-24 px-4 sm:px-6 lg:px-8 z-10">
         <div className="max-w-7xl mx-auto">
           <motion.div
             className="text-center mb-12"
@@ -1010,10 +1235,10 @@ export default function Home() {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-4xl sm:text-5xl font-light mb-3 text-gray-900 tracking-tight">
-              Why Choose AVAX Bridge?
+              Competitive Advantage
             </h2>
             <p className="text-lg text-gray-500 font-light">
-              See how we compare to traditional bridges
+              How we outperform existing bridge solutions
             </p>
           </motion.div>
 
@@ -1028,14 +1253,17 @@ export default function Home() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gradient-to-r from-purple-600 to-blue-600">
-                    <th className="px-5 py-3 text-left font-medium text-sm text-white">
+                    <th className="px-5 py-4 text-left font-medium text-sm text-white">
                       Feature
                     </th>
-                    <th className="px-5 py-3 text-center font-medium text-sm text-white">
-                      Traditional Bridges
+                    <th className="px-5 py-4 text-center font-medium text-sm text-white">
+                      Wormhole
                     </th>
-                    <th className="px-5 py-3 text-center font-medium text-sm text-white">
-                      AVAX Bridge
+                    <th className="px-5 py-4 text-center font-medium text-sm text-white">
+                      Multichain
+                    </th>
+                    <th className="px-5 py-4 text-center font-medium text-sm text-white bg-purple-700/50">
+                      Oryn
                     </th>
                   </tr>
                 </thead>
@@ -1043,33 +1271,57 @@ export default function Home() {
                   {[
                     {
                       feature: "Swap Time",
-                      traditional: "5-30 minutes",
-                      avax: "30 seconds",
-                    },
-                    {
-                      feature: "Custodial Risk",
-                      traditional: "Yes",
-                      avax: "None",
+                      wormhole: "5-15 min",
+                      multichain: "10-30 min",
+                      oryn: "30 seconds",
                     },
                     {
                       feature: "Security Model",
-                      traditional: "Multisig/Custody",
-                      avax: "HTLC Atomic Swaps",
+                      wormhole: "Multisig Validators",
+                      multichain: "Multisig Custody",
+                      oryn: "HTLC Atomic Swaps",
                     },
                     {
-                      feature: "Approvals Needed",
-                      traditional: "Multiple",
-                      avax: "Zero",
+                      feature: "Custodial Risk",
+                      wormhole: "Yes (Validator set)",
+                      multichain: "Yes (Bridge funds)",
+                      oryn: "None",
+                    },
+                    {
+                      feature: "Bitcoin Support",
+                      wormhole: "Limited",
+                      multichain: "No",
+                      oryn: "Native",
+                    },
+                    {
+                      feature: "Wallet Connection",
+                      wormhole: "Required",
+                      multichain: "Required",
+                      oryn: "Not Required",
+                    },
+                    {
+                      feature: "Transaction Approvals",
+                      wormhole: "Multiple",
+                      multichain: "Multiple",
+                      oryn: "None (Deposit Model)",
                     },
                     {
                       feature: "Success Rate",
-                      traditional: "~95%",
-                      avax: "99.9%",
+                      wormhole: "~96%",
+                      multichain: "~94%",
+                      oryn: "99.9%",
+                    },
+                    {
+                      feature: "Hack History",
+                      wormhole: "Yes ($325M)",
+                      multichain: "Yes ($130M+)",
+                      oryn: "Zero incidents",
                     },
                     {
                       feature: "Decentralization",
-                      traditional: "Centralized",
-                      avax: "Fully Decentralized",
+                      wormhole: "Semi-decentralized",
+                      multichain: "Centralized",
+                      oryn: "Fully Decentralized",
                     },
                   ].map((row, index) => (
                     <motion.tr
@@ -1089,16 +1341,52 @@ export default function Home() {
                         {row.feature}
                       </td>
                       <td className="px-5 py-3.5 text-center text-sm text-gray-600">
-                        {row.traditional}
+                        {row.wormhole}
                       </td>
-                      <td className="px-5 py-3.5 text-center font-medium text-sm text-purple-600">
-                        {row.avax}
+                      <td className="px-5 py-3.5 text-center text-sm text-gray-600">
+                        {row.multichain}
+                      </td>
+                      <td className="px-5 py-3.5 text-center font-medium text-sm text-purple-600 bg-purple-50/30">
+                        {row.oryn}
                       </td>
                     </motion.tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          </motion.div>
+
+          <motion.div
+            className="mt-12 grid md:grid-cols-3 gap-6"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            {[
+              {
+                title: "60x Faster",
+                desc: "30 seconds vs. 5-30 minutes for competitors",
+              },
+              {
+                title: "Zero Hacks",
+                desc: "No custodial funds means no hack targets",
+              },
+              {
+                title: "First Mover",
+                desc: "Only bridge using HTLC for Bitcoin-to-EVM swaps",
+              },
+            ].map((advantage, index) => (
+              <div
+                key={index}
+                className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200/60 p-6 rounded-xl text-center"
+              >
+                <div className="text-2xl font-medium text-purple-600 mb-2">
+                  {advantage.title}
+                </div>
+                <div className="text-sm text-gray-600">{advantage.desc}</div>
+              </div>
+            ))}
           </motion.div>
         </div>
       </section>
@@ -1137,15 +1425,15 @@ export default function Home() {
                   },
                   {
                     q: "Is my crypto safe?",
-                    a: "Yes! AVAX Bridge uses HTLC atomic swaps and is fully non-custodial. Your funds never leave your wallet.",
+                    a: "Yes! Oryn uses HTLC atomic swaps for secure execution. You deposit to your account and receive swapped assets directly—no wallet connection needed.",
                   },
                   {
                     q: "What chains are supported?",
                     a: "We support Bitcoin, Avalanche, Ethereum, Polygon, and Arbitrum, with more chains coming soon.",
                   },
                   {
-                    q: "Do I need multiple approvals?",
-                    a: "No! AVAX Bridge requires zero approvals, making the user experience seamless and efficient.",
+                    q: "Do I need to connect my wallet or approve transactions?",
+                    a: "No! Simply deposit your assets to your account. No wallet connection or transaction approvals required. We handle the swap and send directly to you.",
                   },
                   {
                     q: "What is HTLC?",
@@ -1246,7 +1534,7 @@ export default function Home() {
                           <Network className="w-12 h-12 text-white" />
                         </div>
                         <motion.div
-                          className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-400"
+                          className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-400 text-nowrap"
                           animate={{ opacity: [0.5, 1, 0.5] }}
                           transition={{
                             duration: 2,
@@ -1299,12 +1587,12 @@ export default function Home() {
                       </svg>
 
                       {/* Animated particles flowing */}
-                      {Array.from({ length: 8 }).map((_, i) => (
+                      {Array.from({ length: 4 }).map((_, i) => (
                         <motion.div
                           key={i}
                           className="absolute w-2 h-2 rounded-full bg-purple-400"
                           style={{
-                            left: `${32 + i * 24}%`,
+                            left: `${-8 + i * 24}%`,
                             top: "50%",
                           }}
                           animate={{
@@ -1404,15 +1692,23 @@ export default function Home() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <motion.div
-                className="flex items-center gap-2 text-xl font-medium mb-4"
+                className="flex items-center gap-2 mb-4"
                 whileHover={{ scale: 1.05 }}
               >
-                <div className="w-9 h-9 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
-                  <Bitcoin className="w-5 h-5 text-white" />
-                </div>
-                <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  AVAX Bridge
-                </span>
+                <Image
+                  src="/Oryn.svg"
+                  alt="Oryn Logo"
+                  width={36}
+                  height={36}
+                  className="w-9 h-9"
+                />
+                <Image
+                  src="/OrynTypo.svg"
+                  alt="Oryn"
+                  width={100}
+                  height={36}
+                  className="h-7 w-auto"
+                />
               </motion.div>
               <p className="text-sm text-gray-500 leading-relaxed">
                 Move Bitcoin without trust. Fast, secure, non-custodial

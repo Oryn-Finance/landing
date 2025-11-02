@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { AssetDropdown } from "./AssetDropdown";
-import SlideToConfirmButton from "./SlideToConfirmButton";
 import { useAssetsStore } from "../store/assetsStore";
 import Image from "next/image";
 
@@ -15,6 +14,7 @@ const Swap: React.FC<SwapProps> = () => {
   const {
     fromAsset,
     toAsset,
+    sendAmount,
     sendValue,
     receiveValue,
     receiveAmount,
@@ -24,10 +24,9 @@ const Swap: React.FC<SwapProps> = () => {
     fetchAssets,
     setFromAsset,
     setToAsset,
+    setSendAmount,
     swapAssets,
     setShowHero,
-    resetSwapState,
-    setsendValue,
   } = useAssetsStore();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<"from" | "to" | null>(
@@ -35,10 +34,9 @@ const Swap: React.FC<SwapProps> = () => {
   );
 
   useEffect(() => {
-    resetSwapState();
     fetchAssets();
     setShowHero(true);
-  }, [fetchAssets, setShowHero, resetSwapState]);
+  }, [fetchAssets, setShowHero]);
 
   const handleAssetSelect = (asset: typeof fromAsset, type: "from" | "to") => {
     if (type === "from") {
@@ -61,8 +59,8 @@ const Swap: React.FC<SwapProps> = () => {
             width={576}
             height={200}
           />
-          <div className="bg-white mb-2 w-full rounded-b-[30px] border-b border-x border-gray-100 p-6">
-            <label className="block text-2xl font-medium text-gray-700 mb-4">
+          <div className="bg-white mb-2 w-full rounded-b-[30px] border-b border-x border-gray-100 px-6 pb-4">
+            <label className="block text-lg font-medium text-gray-700 mb-4">
               You Pay
             </label>
             <div className="w-full flex items-center justify-between gap-3">
@@ -77,47 +75,54 @@ const Swap: React.FC<SwapProps> = () => {
                   onSelect={(asset) => handleAssetSelect(asset, "from")}
                 />
               </div>
-              <div className="relative w-fit">
+              <div className="relative w-fit flex flex-col items-end">
                 <input
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9]*[.,]?[0-9]*"
                   placeholder="0.0"
-                  value={sendValue}
+                  value={sendAmount}
                   onChange={(e) => {
                     let value = e.target.value;
+
                     // If user types just ".", convert to "0."
                     if (value === ".") {
-                      value = "0.";
+                      setSendAmount("0.");
+                      return;
                     }
+
                     // Remove any non-numeric characters except decimal point
                     value = value.replace(/[^0-9.]/g, "");
+
                     // Ensure only one decimal point
                     const parts = value.split(".");
                     if (parts.length > 2) {
                       value = parts[0] + "." + parts.slice(1).join("");
                     }
-                    setsendValue(value);
+
+                    // Limit decimal places to 6
+                    if (parts.length === 2 && parts[1].length > 6) {
+                      value = parts[0] + "." + parts[1].substring(0, 6);
+                    }
+
+                    // Always set the value through setSendAmount for proper validation
+                    // This allows "0.", "0.0", "0.00", etc.
+                    setSendAmount(value);
                   }}
                   className="text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-auto min-w-[80px] text-right"
                   disabled={!fromAsset}
                   autoComplete="off"
                 />
                 {sendValue && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-                    {isQuoteLoading && (
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    )}
-                    <span className="text-xs text-gray-500 font-medium translate-y-6 translate-x-3">
-                      $
-                      {parseFloat(sendValue).toLocaleString(undefined, {
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
+                  <span className="text-xs text-gray-500 font-medium mt-1">
+                    ≈ $
+                    {parseFloat(sendValue).toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
                 )}
-                {!sendValue && isQuoteLoading && (
-                  <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
+                {isQuoteLoading && (
+                  <div className="absolute right-0 top-0">
                     <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 )}
@@ -126,7 +131,7 @@ const Swap: React.FC<SwapProps> = () => {
           </div>
         </div>
 
-        <div className="flex -my-2 w-full items-center absolute justify-center z-10 left-0 top-[calc(50%)]">
+        <div className="flex -my-2 w-full items-center absolute justify-center z-10 left-0 top-[calc(46%)]">
           <motion.button
             whileHover={{ scale: 1, rotate: 180 }}
             whileTap={{ scale: 0.95 }}
@@ -155,7 +160,7 @@ const Swap: React.FC<SwapProps> = () => {
         {/* To Asset */}
         <div className="w-full mb-4">
           <div className="bg-white w-full rounded-[30px] border-t border-x border-gray-100 p-6">
-            <label className="block text-2xl font-medium text-gray-700 mb-4">
+            <label className="block text-lg font-medium text-gray-700 mb-4">
               You Receive
             </label>
             <div className="w-full flex items-center justify-between gap-3">
@@ -170,30 +175,31 @@ const Swap: React.FC<SwapProps> = () => {
                   onSelect={(asset) => handleAssetSelect(asset, "to")}
                 />
               </div>
-              <div className="relative w-fit">
+              <div className="relative w-fit flex flex-col items-end">
                 <input
-                  type="decimal"
+                  type="text"
                   placeholder="0.0"
-                  value={receiveAmount}
+                  value={
+                    receiveAmount
+                      ? Number(receiveAmount)
+                          .toFixed(6)
+                          .replace(/\.?0+$/, "") || "0"
+                      : ""
+                  }
                   readOnly
                   className="text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-auto min-w-[80px] text-right"
                   disabled={!toAsset}
                 />
                 {receiveValue && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-                    {isQuoteLoading && (
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    )}
-                    <span className="text-xs text-gray-500 font-medium translate-y-6 translate-x-3">
-                      $
-                      {parseFloat(receiveValue).toLocaleString(undefined, {
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
+                  <span className="text-xs text-gray-500 font-medium mt-1">
+                    ≈ $
+                    {parseFloat(receiveValue).toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
                 )}
-                {!receiveValue && isQuoteLoading && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                {isQuoteLoading && (
+                  <div className="absolute right-0 top-0">
                     <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 )}
@@ -203,11 +209,11 @@ const Swap: React.FC<SwapProps> = () => {
         </div>
       </div>
       <div className="w-full mb-4 px-6">
-        <div className="bg-white w-full rounded-t-[30px] border-t border-x border-gray-100 p-6">
-          <label className="block text-2xl font-medium text-gray-700 mb-3">
+        <div className="bg-white w-full rounded-t-[30px] border-t border-x border-gray-100 px-6 pt-6">
+          <label className="block text-lg font-medium text-gray-700 mb-3">
             Fees & Rate
           </label>
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {quote?.result?.[0]?.feeBips !== undefined &&
               fromAsset &&
               sendValue && (
@@ -286,36 +292,73 @@ const Swap: React.FC<SwapProps> = () => {
           height={200}
           width={576}
         />
-        <SlideToConfirmButton
-        disabled={
-          !fromAsset ||
-          !toAsset ||
-          !sendValue ||
-          !quote ||
-          !receiveAmount ||
-          isLoading ||
-          isQuoteLoading
-        }
-        isLoading={isLoading || isQuoteLoading}
-        loadingText={
-          isLoading
-            ? "Loading Assets..."
-            : isQuoteLoading
-            ? "Getting Quote..."
-            : "Processing..."
-        }
-        confirmText="Confirm Swap"
-        onConfirm={() => {
-          // Handle swap confirmation here
-          console.log("Swap confirmed:", {
-            fromAsset,
-            toAsset,
-            sendValue,
-            receiveAmount,
-          });
-          // TODO: Implement actual swap logic
-        }}
-      />
+        <motion.button
+          disabled={
+            !fromAsset ||
+            !toAsset ||
+            !sendAmount ||
+            !quote ||
+            !receiveAmount ||
+            isLoading ||
+            isQuoteLoading
+          }
+          onClick={() => {
+            // Handle swap confirmation here
+            console.log("Swap confirmed:", {
+              fromAsset,
+              toAsset,
+              sendAmount,
+              receiveAmount,
+              sendValue,
+              receiveValue,
+            });
+            // TODO: Implement actual swap logic
+          }}
+          className={`w-full py-4 px-6 rounded-full cursor-pointer mt-6 font-semibold text-base transition-all duration-300 ${
+            !fromAsset ||
+            !toAsset ||
+            !sendAmount ||
+            !quote ||
+            !receiveAmount ||
+            isLoading ||
+            isQuoteLoading
+              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+              : "bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl"
+          }`}
+          whileHover={
+            !fromAsset ||
+            !toAsset ||
+            !sendAmount ||
+            !quote ||
+            !receiveAmount ||
+            isLoading ||
+            isQuoteLoading
+              ? {}
+              : { scale: 1.02 }
+          }
+          whileTap={
+            !fromAsset ||
+            !toAsset ||
+            !sendAmount ||
+            !quote ||
+            !receiveAmount ||
+            isLoading ||
+            isQuoteLoading
+              ? {}
+              : { scale: 0.98 }
+          }
+        >
+          {isLoading || isQuoteLoading ? (
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>
+                {isLoading ? "Loading Assets..." : "Getting Quote..."}
+              </span>
+            </div>
+          ) : (
+            "Confirm Swap"
+          )}
+        </motion.button>
       </div>
     </div>
   );

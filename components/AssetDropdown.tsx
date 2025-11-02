@@ -14,13 +14,17 @@ const ASSET_LOGOS: Record<string, string> = {
 };
 
 const CHAIN_LOGOS: Record<string, string> = {
-  "Arbitrum Sepolia": "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
-  "Avalanche Testnet": "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  "Bitcoin Testnet": "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  "Starknet Sepolia": "	https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-  "Avalanche": "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  "Bitcoin": "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  "Starknet": "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  "Arbitrum Sepolia":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
+  "Avalanche Testnet":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  "Bitcoin Testnet":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  "Starknet Sepolia":
+    "	https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
 };
 
 function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
@@ -50,7 +54,9 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
     );
   }
   return (
-    <div className={`${sizeClasses[size]} bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium`}>
+    <div
+      className={`${sizeClasses[size]} bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium`}
+    >
       {symbol.charAt(0)}
     </div>
   );
@@ -74,7 +80,9 @@ function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
     );
   }
   return (
-    <div className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-medium text-gray-500 border-2 border-white`}>
+    <div
+      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-medium text-gray-500 border-2 border-white`}
+    >
       {chainName.charAt(0)}
     </div>
   );
@@ -109,7 +117,7 @@ export const AssetDropdown: React.FC<{
         onClick={onToggle}
         className="flex items-center justify-between gap-2 px-0 py-2 bg-transparent border-0 hover:opacity-80 focus:outline-none transition-opacity"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 cursor-pointer h-12 overflow-hidden">
           {selectedAsset ? (
             <>
               {/* Asset logo (bigger) with chain logo (smaller) as badge */}
@@ -132,8 +140,9 @@ export const AssetDropdown: React.FC<{
           )}
         </div>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
-            }`}
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -186,9 +195,10 @@ export const AssetDropdown: React.FC<{
                       key={asset.value}
                       onClick={() => onSelect(asset)}
                       className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-150 group
-                        ${isSelected
-                          ? "bg-[#e84142]/5 border-2 border-[#e84142]/70 shadow"
-                          : "hover:bg-gray-50 border border-transparent"
+                        ${
+                          isSelected
+                            ? "bg-[#e84142]/5 border-2 border-[#e84142]/70 shadow"
+                            : "hover:bg-gray-50 border border-transparent"
                         } focus:outline-none`}
                     >
                       <div className="flex items-center w-full gap-3">
