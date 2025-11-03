@@ -20,14 +20,12 @@ export function Navbar({ onOrdersClick }: NavbarProps = {}) {
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
-        className="relative z-50 bg-white/70 backdrop-blur-xl border-b border-purple-100/50"
+        className="relative z-50 bg-[#070011]/70 backdrop-blur-xl border-b border-purple-100/10"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 xs:h-16 md:h-20">
             <Link href="/">
-              <motion.div
-                className="flex items-center gap-1.5 md:gap-2 cursor-pointer"
-              >
+              <motion.div className="flex items-center gap-1.5 md:gap-2 cursor-pointer">
                 <Image
                   src="/Oryn.svg"
                   alt="Oryn Logo"

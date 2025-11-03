@@ -6,25 +6,98 @@ import { motion } from "framer-motion";
 import axios from "axios";
 import QRCodeSVG from "react-qr-code";
 import { Navbar } from "../../../components/Navbar";
+import OrdersSidebar from "../../../components/OrdersSidebar";
+import PixelBlast from "@/components/ui/PixelBlast";
 import { API_URLS } from "../../../constants/constants";
-import type { Order, OrderStatus } from "../../../types/order";
-import { ArrowLeft, Copy, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import type { Order } from "../../../types/order";
+import { Copy, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import Image from "next/image";
 
-const STATUS_STEPS: OrderStatus[] = [
-  "initiated",
-  "awaiting_deposit",
-  "deposit_detected",
-  "redeeming",
-  "complete",
-];
-
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  initiated: "Initiated",
-  awaiting_deposit: "Awaiting Deposit",
-  deposit_detected: "Deposit Detected",
-  redeeming: "Redeeming",
-  complete: "Complete",
+const ASSET_LOGOS: Record<string, string> = {
+  wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
+  avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
+  bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  strk: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
 };
+
+const CHAIN_LOGOS: Record<string, string> = {
+  "Arbitrum Sepolia":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
+  "Avalanche Testnet":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  "Bitcoin Testnet":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  "Starknet Sepolia":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+};
+
+function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
+  const key = symbol.toLowerCase();
+  let url: string | undefined;
+  if (key === "btc" || key === "bitcoin") url = ASSET_LOGOS.bitcoin;
+  else if (key === "usdc") url = ASSET_LOGOS.usdc;
+  else if (key === "wbtc") url = ASSET_LOGOS.wbtc;
+  else if (key === "avax") url = ASSET_LOGOS.avax;
+  else if (key === "strk") url = ASSET_LOGOS.strk;
+
+  const sizeClasses = {
+    sm: "w-4 h-4",
+    md: "w-8 h-8",
+    lg: "w-10 h-10",
+  };
+
+  if (url) {
+    return (
+      <Image
+        src={url.trim()}
+        alt={symbol}
+        className={`${sizeClasses[size]} rounded-full object-contain`}
+        style={{ background: "#fff" }}
+        width={200}
+        height={200}
+      />
+    );
+  }
+  return (
+    <div
+      className={`${sizeClasses[size]} bg-gray-700 rounded-full flex items-center justify-center text-xs font-medium text-gray-300`}
+    >
+      {symbol.charAt(0)}
+    </div>
+  );
+}
+
+function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
+  const url = CHAIN_LOGOS[chainName];
+  const sizeClasses = {
+    xs: "w-4 h-4",
+    sm: "w-5 h-5",
+  };
+
+  if (url) {
+    return (
+      <Image
+        src={url.trim()}
+        alt={chainName}
+        className={`${sizeClasses[size]} rounded-full object-contain border-2 border-gray-700`}
+        style={{ background: "#fff" }}
+        width={32}
+        height={32}
+      />
+    );
+  }
+  return (
+    <div
+      className={`${sizeClasses[size]} bg-gray-700 rounded-full flex items-center justify-center text-[10px] font-medium text-gray-300 border-2 border-gray-600`}
+    >
+      {chainName.charAt(0)}
+    </div>
+  );
+}
 
 function getAssetInfo(assetString: string): { chain: string; symbol: string } {
   const parts = assetString.split(":");
@@ -59,7 +132,8 @@ export default function OrderDetailsPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [isOrdersSidebarOpen, setIsOrdersSidebarOpen] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isOrderCompleteRef = useRef(false);
 
@@ -67,7 +141,6 @@ export default function OrderDetailsPage() {
     if (!orderId) return;
 
     const fetchOrder = async (isInitialLoad = false) => {
-      // Stop polling if order is already complete
       if (isOrderCompleteRef.current) {
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current);
@@ -96,23 +169,20 @@ export default function OrderDetailsPage() {
           },
         });
 
-        // Handle different possible response formats
         let orderData: Order | null = null;
 
-        // Format 1: { status: "Ok", result: Order }
         if (
           "status" in response.data &&
           "result" in response.data &&
           response.data.status === "Ok"
         ) {
           orderData = response.data.result;
-        }
-        // Format 2: { data: Order }
-        else if ("data" in response.data && "order_id" in response.data.data) {
+        } else if (
+          "data" in response.data &&
+          "order_id" in response.data.data
+        ) {
           orderData = response.data.data;
-        }
-        // Format 3: Direct Order object
-        else if ("order_id" in response.data) {
+        } else if ("order_id" in response.data) {
           orderData = response.data as Order;
         }
 
@@ -120,7 +190,6 @@ export default function OrderDetailsPage() {
           setOrder(orderData);
           setError(null);
 
-          // Check if order is complete and stop polling
           if (
             orderData.source_intent.state === "completed" ||
             orderData.destination_intent.state === "completed"
@@ -148,18 +217,12 @@ export default function OrderDetailsPage() {
       }
     };
 
-    // Reset completion flag when orderId changes
     isOrderCompleteRef.current = false;
-
-    // Initial fetch
     fetchOrder(true);
-
-    // Set up polling every 2 seconds
     pollIntervalRef.current = setInterval(() => {
       fetchOrder(false);
     }, 2000);
 
-    // Cleanup interval on unmount or when orderId changes
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -168,197 +231,230 @@ export default function OrderDetailsPage() {
     };
   }, [orderId]);
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, fieldName: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
+      setCopiedAddress(fieldName);
+      setTimeout(() => setCopiedAddress(null), 2000);
     } catch (err) {
       console.error("Failed to copy:", err);
     }
   };
 
-  const getCurrentStatus = (): OrderStatus => {
-    if (!order) return "initiated";
+  // Check if deposit is detected (has create_tx)
+  const isDepositDetected = Boolean(
+    order?.source_intent.transactions.create_tx ||
+      order?.destination_intent.transactions.create_tx
+  );
 
-    // Determine status based on order state
-    // This is a simplified version - you may need to adjust based on actual API response
-    if (
-      order.source_intent.state === "completed" ||
-      order.destination_intent.state === "completed"
-    ) {
-      return "complete";
-    }
-    if (
-      order.source_intent.state === "redeeming" ||
-      order.destination_intent.state === "redeeming"
-    ) {
-      return "redeeming";
-    }
-    if (
-      order.source_intent.transactions.create_tx ||
-      order.destination_intent.transactions.create_tx
-    ) {
-      return "deposit_detected";
-    }
-    if (
-      order.source_intent.deposit_address ||
-      order.destination_intent.deposit_address
-    ) {
-      return "awaiting_deposit";
-    }
-    return "initiated";
-  };
+  // Check if redeemed (has claim_tx or state is redeeming/completed)
+  const isRedeemed = Boolean(
+    order?.source_intent.transactions.claim_tx ||
+      order?.destination_intent.transactions.claim_tx ||
+      order?.source_intent.state === "redeeming" ||
+      order?.destination_intent.state === "redeeming" ||
+      order?.source_intent.state === "completed" ||
+      order?.destination_intent.state === "completed"
+  );
 
-  const currentStatus = getCurrentStatus();
-  const currentStatusIndex = STATUS_STEPS.indexOf(currentStatus);
-  const depositAddress = order?.source_intent.deposit_address || "";
+  // Check if completed/claimed
+  const isClaimed = Boolean(
+    order?.source_intent.state === "completed" ||
+      order?.destination_intent.state === "completed"
+  );
+
+  // Get deposit tx hash (create_tx)
+  const depositTxHash =
+    order?.source_intent.transactions.create_tx ||
+    order?.destination_intent.transactions.create_tx ||
+    null;
+
+  // Get claim tx hash
+  const claimTxHash =
+    order?.source_intent.transactions.claim_tx ||
+    order?.destination_intent.transactions.claim_tx ||
+    null;
 
   const sourceInfo = order ? getAssetInfo(order.source_intent.asset) : null;
   const destinationInfo = order
     ? getAssetInfo(order.destination_intent.asset)
     : null;
 
+  const sourceDepositAddress = order?.source_intent.deposit_address || "";
+
+  const handleOrderClick = (id: string) => {
+    router.push(`/order/${id}`);
+    setIsOrdersSidebarOpen(false);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-      <Navbar onOrdersClick={() => router.push("/swap")} />
+    <div className="min-h-screen bg-[#070011] text-white overflow-x-hidden">
+      {/* Navigation */}
+      <Navbar onOrdersClick={() => setIsOrdersSidebarOpen(true)} />
 
-      <div className="relative z-10 min-h-[calc(100vh-56px)] xs:min-h-[calc(100vh-64px)] md:min-h-[calc(100vh-80px)] px-3 xs:px-4 sm:px-6 lg:px-8 py-4 xs:py-6 md:py-12">
-        <div className="max-w-3xl mx-auto">
-          {/* Back Button */}
-          <motion.button
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={() => router.push("/swap")}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-6"
+      {/* PixelBlast Background */}
+      <div className="fixed inset-0 w-full h-full z-0 pointer-events-none">
+        <PixelBlast
+          variant="square"
+          pixelSize={4}
+          color="#B19EEF"
+          patternScale={2}
+          patternDensity={1}
+          pixelSizeJitter={0}
+          enableRipples
+          rippleSpeed={0.5}
+          rippleThickness={0.12}
+          rippleIntensityScale={1.5}
+          liquid
+          liquidStrength={0.12}
+          liquidRadius={1.2}
+          liquidWobbleSpeed={5}
+          speed={0.6}
+          edgeFade={0.25}
+          transparent
+        />
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 min-h-[calc(100vh-56px)] xs:min-h-[calc(100vh-64px)] md:min-h-[calc(100vh-80px)] flex items-center justify-center px-3 xs:px-4 sm:px-6 lg:px-8 py-4 xs:py-6 md:py-12">
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="w-full max-w-2xl bg-white/10 backdrop-blur-lg border border-white/50 rounded-3xl p-8 text-center"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm font-medium">Back to Swap</span>
-          </motion.button>
+            <Loader2 className="w-8 h-8 animate-spin text-purple-400 mx-auto mb-4" />
+            <p className="text-gray-300">Loading order details...</p>
+          </motion.div>
+        )}
 
-          {/* Loading State */}
-          {isLoading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-white rounded-2xl p-8 text-center"
+        {error && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-2xl bg-white/10 backdrop-blur-lg border border-red-500/50 rounded-3xl p-8 text-center"
+          >
+            <p className="text-red-300 mb-4">{error}</p>
+            <button
+              onClick={() => router.push("/swap")}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
             >
-              <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-4" />
-              <p className="text-gray-600">Loading order details...</p>
-            </motion.div>
-          )}
+              Return to Swap
+            </button>
+          </motion.div>
+        )}
 
-          {/* Error State */}
-          {error && !isLoading && (
+        {order && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="w-full max-w-2xl"
+          >
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-2xl p-8 text-center"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="scale-90 origin-top rounded-3xl bg-white/10 backdrop-blur-lg border border-white/50 p-6 space-y-4"
             >
-              <p className="text-red-600 mb-4">{error}</p>
-              <button
-                onClick={() => router.push("/swap")}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                Return to Swap
-              </button>
-            </motion.div>
-          )}
-
-          {/* Order Details */}
-          {order && !isLoading && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              {/* Order Header - From/To */}
-              <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                <h1 className="text-2xl font-semibold text-gray-900 mb-6">
+              {/* Order Header - From/To Assets */}
+              <div className="bg-white/10 backdrop-blur-sm border border-gray-700/40 rounded-[30px] p-4">
+                <h1 className="text-lg font-semibold text-white mb-4">
                   Order Details
                 </h1>
-
-                <div className="flex items-center justify-between">
-                  {/* From */}
-                  <div className="flex-1 text-center">
-                    <div className="text-sm text-gray-500 mb-2">From</div>
-                    {sourceInfo && (
-                      <>
-                        <div className="text-lg font-semibold text-gray-900 mb-1">
+                <div className="w-full flex items-center justify-between gap-2 md:gap-3">
+                  {/* From Asset */}
+                  {sourceInfo && (
+                    <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                      <div className="relative flex items-center shrink-0">
+                        {getAssetLogo(sourceInfo.symbol, "lg")}
+                        <div className="absolute -bottom-1 -right-1">
+                          {getChainLogo(sourceInfo.chain, "sm")}
+                        </div>
+                      </div>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="font-semibold text-white text-base md:text-lg leading-tight truncate">
                           {sourceInfo.symbol}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {sourceInfo.chain}
-                        </div>
-                        <div className="text-sm font-medium text-gray-700 mt-2">
+                        </span>
+                        <span className="text-sm font-medium text-gray-300">
                           {formatAmount(order.source_intent.amount, 8)}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Arrow */}
-                  <div className="mx-4">
-                    <ArrowLeft className="w-6 h-6 text-gray-400 rotate-180" />
+                  <div className="mx-2 shrink-0">
+                    <svg
+                      className="w-5 h-5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
                   </div>
 
-                  {/* To */}
-                  <div className="flex-1 text-center">
-                    <div className="text-sm text-gray-500 mb-2">To</div>
-                    {destinationInfo && (
-                      <>
-                        <div className="text-lg font-semibold text-gray-900 mb-1">
+                  {/* To Asset */}
+                  {destinationInfo && (
+                    <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 justify-end">
+                      <div className="flex flex-col min-w-0 flex-1 items-end">
+                        <span className="font-semibold text-white text-base md:text-lg leading-tight truncate">
                           {destinationInfo.symbol}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {destinationInfo.chain}
-                        </div>
-                        <div className="text-sm font-medium text-gray-700 mt-2">
+                        </span>
+                        <span className="text-sm font-medium text-gray-300">
                           {formatAmount(order.destination_intent.amount, 8)}
+                        </span>
+                      </div>
+                      <div className="relative flex items-center shrink-0">
+                        {getAssetLogo(destinationInfo.symbol, "lg")}
+                        <div className="absolute -bottom-1 -right-1">
+                          {getChainLogo(destinationInfo.chain, "sm")}
                         </div>
-                      </>
-                    )}
-                  </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Deposit Address & QR Code */}
-              {depositAddress && (
-                <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              {sourceDepositAddress && (
+                <div className="bg-white/10 backdrop-blur-sm border border-gray-700/40 rounded-[30px] p-4">
+                  <h2 className="text-base font-semibold text-white mb-3">
                     Deposit Address
                   </h2>
-                  <div className="space-y-4">
-                    {/* Address */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-mono text-gray-700 break-all">
-                          {depositAddress}
-                        </p>
-                        <button
-                          onClick={() => copyToClipboard(depositAddress)}
-                          className="flex-shrink-0 p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                          title="Copy address"
-                        >
-                          {copiedAddress ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <Copy className="w-5 h-5 text-gray-600" />
-                          )}
-                        </button>
-                      </div>
+                  <div className="space-y-3">
+                    <div className="bg-white/5 rounded-lg p-3 flex items-center justify-between gap-2">
+                      <p className="text-sm font-mono text-gray-300 break-all flex-1">
+                        {sourceDepositAddress}
+                      </p>
+                      <button
+                        onClick={() =>
+                          copyToClipboard(sourceDepositAddress, "deposit")
+                        }
+                        className="shrink-0 p-2 hover:bg-white/10 rounded-lg transition-colors"
+                        title="Copy address"
+                      >
+                        {copiedAddress === "deposit" ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-400" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-gray-400" />
+                        )}
+                      </button>
                     </div>
-
-                    {/* QR Code */}
-                    <div className="flex justify-center p-4 bg-white rounded-lg border border-gray-200">
+                    <div className="flex justify-center p-4 bg-white/5 rounded-lg">
                       <QRCodeSVG
-                        value={depositAddress}
-                        size={200}
+                        value={sourceDepositAddress}
+                        size={180}
                         level="M"
-                        className="w-full max-w-[200px]"
+                        className="w-full max-w-[180px]"
                       />
                     </div>
-
                     <p className="text-xs text-gray-500 text-center">
                       Scan this QR code or copy the address above to send your
                       deposit
@@ -367,103 +463,229 @@ export default function OrderDetailsPage() {
                 </div>
               )}
 
-              {/* Status Progress */}
-              <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-900 mb-6">
-                  Status
+              {/* Progress Steps - Vertical */}
+              <div className="bg-white/10 backdrop-blur-sm border border-gray-700/40 rounded-[30px] p-4">
+                <h2 className="text-base font-semibold text-white mb-4">
+                  Progress
                 </h2>
-
                 <div className="relative space-y-0">
-                  {STATUS_STEPS.map((status, index) => {
-                    const isCompleted = index < currentStatusIndex;
-                    const isCurrent = index === currentStatusIndex;
-
-                    return (
-                      <div key={status} className="relative">
-                        <div className="flex items-start gap-4 pb-6">
-                          {/* Status Icon */}
-                          <div className="shrink-0 mt-0.5 relative z-10">
-                            {isCompleted ? (
-                              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
-                                <CheckCircle2 className="w-5 h-5 text-white" />
-                              </div>
-                            ) : isCurrent ? (
-                              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
-                                <Clock className="w-5 h-5 text-white animate-pulse" />
-                              </div>
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                <div className="w-4 h-4 rounded-full bg-gray-400" />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Status Label */}
-                          <div className="flex-1 pt-1">
-                            <div
-                              className={`font-medium ${
-                                isCurrent
-                                  ? "text-purple-600"
-                                  : isCompleted
-                                  ? "text-green-600"
-                                  : "text-gray-400"
-                              }`}
-                            >
-                              {STATUS_LABELS[status]}
-                            </div>
-                            {isCurrent && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                In progress...
-                              </div>
-                            )}
-                          </div>
+                  {/* Step 1: Order Created - Always completed */}
+                  <div className="relative">
+                    <div className="flex items-start gap-3 pb-4">
+                      <div className="shrink-0 mt-0.5 relative z-10">
+                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
                         </div>
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <div className="text-sm font-medium text-green-400">
+                          Order Created
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      className="absolute left-3 w-0.5 bg-green-500"
+                      style={{ top: "1.5rem", height: "1.5rem" }}
+                    />
+                  </div>
 
-                        {/* Connector Line */}
-                        {index < STATUS_STEPS.length - 1 && (
-                          <div
-                            className={`absolute left-4 w-0.5 ${
-                              isCompleted ? "bg-green-500" : "bg-gray-200"
-                            }`}
-                            style={{ top: "2rem", height: "2.5rem" }}
-                          />
+                  {/* Step 2: Awaiting Deposit / Deposit Detected */}
+                  <div className="relative">
+                    <div className="flex items-start gap-3 pb-4">
+                      <div className="shrink-0 mt-0.5 relative z-10">
+                        {isDepositDetected ? (
+                          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center">
+                            <Clock className="w-4 h-4 text-white animate-pulse" />
+                          </div>
                         )}
                       </div>
-                    );
-                  })}
+                      <div className="flex-1 pt-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div
+                            className={`text-sm font-medium ${
+                              isDepositDetected
+                                ? "text-green-400"
+                                : "text-purple-400"
+                            }`}
+                          >
+                            {isDepositDetected
+                              ? "Deposit Detected"
+                              : "Awaiting Deposit"}
+                          </div>
+                          {isDepositDetected && depositTxHash && (
+                            <button
+                              onClick={() =>
+                                copyToClipboard(depositTxHash, "deposit_tx")
+                              }
+                              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                              title="Copy transaction hash"
+                            >
+                              <span className="font-mono truncate max-w-[100px]">
+                                {depositTxHash.slice(0, 6)}...
+                                {depositTxHash.slice(-4)}
+                              </span>
+                              {copiedAddress === "deposit_tx" ? (
+                                <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
+                              ) : (
+                                <Copy className="w-3 h-3 shrink-0" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        {!isDepositDetected && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            In progress...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      className={`absolute left-3 w-0.5 ${
+                        isDepositDetected ? "bg-green-500" : "bg-gray-700"
+                      }`}
+                      style={{ top: "1.5rem", height: "1.5rem" }}
+                    />
+                  </div>
+
+                  {/* Step 3: Awaiting Redeem / Redeemed */}
+                  <div className="relative">
+                    <div className="flex items-start gap-3 pb-4">
+                      <div className="shrink-0 mt-0.5 relative z-10">
+                        {isRedeemed ? (
+                          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                          </div>
+                        ) : isDepositDetected ? (
+                          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center">
+                            <Clock className="w-4 h-4 text-white animate-pulse" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center">
+                            <div className="w-3 h-3 rounded-full bg-gray-500" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div
+                            className={`text-sm font-medium ${
+                              isRedeemed
+                                ? "text-green-400"
+                                : isDepositDetected
+                                ? "text-purple-400"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {isRedeemed ? "Redeemed" : "Awaiting Redeem"}
+                          </div>
+                          {isRedeemed && claimTxHash && (
+                            <button
+                              onClick={() =>
+                                copyToClipboard(claimTxHash, "claim_tx")
+                              }
+                              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                              title="Copy transaction hash"
+                            >
+                              <span className="font-mono truncate max-w-[100px]">
+                                {claimTxHash.slice(0, 6)}...
+                                {claimTxHash.slice(-4)}
+                              </span>
+                              {copiedAddress === "claim_tx" ? (
+                                <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
+                              ) : (
+                                <Copy className="w-3 h-3 shrink-0" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        {!isRedeemed && isDepositDetected && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            In progress...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      className={`absolute left-3 w-0.5 ${
+                        isRedeemed
+                          ? "bg-green-500"
+                          : isDepositDetected
+                          ? "bg-gray-700"
+                          : "bg-gray-700"
+                      }`}
+                      style={{ top: "1.5rem", height: "1.5rem" }}
+                    />
+                  </div>
+
+                  {/* Step 4: Claimed or Refunded */}
+                  <div className="relative">
+                    <div className="flex items-start gap-3 pb-4">
+                      <div className="shrink-0 mt-0.5 relative z-10">
+                        {isClaimed ? (
+                          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center">
+                            <div className="w-3 h-3 rounded-full bg-gray-500" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <div
+                          className={`text-sm font-medium ${
+                            isClaimed ? "text-green-400" : "text-gray-500"
+                          }`}
+                        >
+                          {isClaimed ? "Claimed" : "Claimed / Refunded"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Order Info */}
-              <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-white/10 backdrop-blur-sm border border-gray-700/40 rounded-[30px] p-4">
+                <h2 className="text-base font-semibold text-white mb-3">
                   Order Information
                 </h2>
-                <div className="space-y-3 text-sm">
+                <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Order ID</span>
-                    <span className="text-gray-900 font-mono text-xs">
+                    <span className="text-gray-400">Order ID</span>
+                    <span className="text-gray-300 font-mono text-xs">
                       {order.order_id}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Created</span>
-                    <span className="text-gray-900">
+                    <span className="text-gray-400">Created</span>
+                    <span className="text-gray-300">
                       {new Date(order.created_at).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Last Updated</span>
-                    <span className="text-gray-900">
+                    <span className="text-gray-400">Last Updated</span>
+                    <span className="text-gray-300">
                       {new Date(order.updated_at).toLocaleString()}
                     </span>
                   </div>
                 </div>
               </div>
             </motion.div>
-          )}
-        </div>
+          </motion.div>
+        )}
       </div>
+
+      {/* Orders Sidebar */}
+      <OrdersSidebar
+        isOpen={isOrdersSidebarOpen}
+        onClose={() => setIsOrdersSidebarOpen(false)}
+        onOrderClick={handleOrderClick}
+      />
     </div>
   );
 }

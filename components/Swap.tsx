@@ -6,8 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AssetDropdown } from "./AssetDropdown";
 import { useAssetsStore } from "../store/assetsStore";
 import { useWalletStore } from "../store/walletStore";
-import Image from "next/image";
-import SlideToConfirmButton from "./SlideToConfirmButton";
 
 interface SwapProps {
   onOrderCreated?: (orderId: string) => void;
@@ -125,19 +123,12 @@ const Swap: React.FC<SwapProps> = () => {
   };
 
   return (
-    <div className="mx-auto p-6 max-w-xl w-full overflow-x-hidden md:overflow-x-visible scale-80 origin-top">
+    <div className="mx-auto max-w-xl w-full overflow-x-hidden md:overflow-x-visible origin-top">
       <div className="w-full mx-auto flex items-center flex-col rounded-3xl">
-        <Image
-          src="/toprectangle.png"
-          alt="toprectangle"
-          className="w-full h-10 -mb-1"
-          width={576}
-          height={200}
-        />
         <div className="relative w-full">
           <div className="w-full">
-            <div className="bg-white mb-4 w-full rounded-b-[30px] border-b border-x border-gray-100 p-4 md:p-6">
-              <label className="block text-xl md:text-2xl font-medium text-gray-700 mb-3 md:mb-4">
+            <div className="bg-white/10 mb-4 w-full rounded-[30px] border-b border-x border-gray-700/40 p-4">
+              <label className="block text-lg font-medium text-white">
                 You Pay
               </label>
               <div className="w-full flex items-center justify-between gap-2 md:gap-3">
@@ -187,12 +178,12 @@ const Swap: React.FC<SwapProps> = () => {
                       }
                       setSendAmount(value);
                     }}
-                    className="text-xl md:text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
+                    className="text-xl md:text-2xl font-bold text-white bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
                     disabled={!fromAsset}
                     autoComplete="off"
                   />
                   {sendValue && (
-                    <span className="text-xs text-gray-500 font-medium">
+                    <span className="text-sm text-gray-400 font-medium">
                       ≈ $
                       {parseFloat(sendValue).toLocaleString(undefined, {
                         maximumFractionDigits: 2,
@@ -231,17 +222,17 @@ const Swap: React.FC<SwapProps> = () => {
               </motion.button>
             </div>
             <div
-              className={`bg-white w-full duration-300 ${
+              className={`bg-white/10 w-full duration-300 ${
                 !quote || !sendValue || parseFloat(sendValue) <= 0
-                  ? "rounded-t-[30px] rounded-b-none"
+                  ? "rounded-[30px]"
                   : "rounded-[30px]"
               } border-t border-x ${
                 !quote || !sendValue || parseFloat(sendValue) <= 0
                   ? "border-b-0"
                   : "border-b"
-              } border-gray-100 p-4 md:p-6`}
+              } border-gray-700/40 p-4`}
             >
-              <label className="block text-xl md:text-2xl font-medium text-gray-700 mb-3">
+              <label className="block text-lg font-medium text-white">
                 You Receive
               </label>
               <div className="w-full flex items-center justify-between gap-2 md:gap-3">
@@ -268,12 +259,12 @@ const Swap: React.FC<SwapProps> = () => {
                         : ""
                     }
                     readOnly
-                    className="text-xl md:text-2xl font-bold text-gray-900 bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
+                    className="text-xl md:text-2xl font-bold text-white bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
                     disabled={!toAsset}
                   />
                   {receiveValue && (
-                    <span className="text-xs text-gray-500 font-medium">
-                      $
+                    <span className="text-sm text-gray-400 font-medium">
+                      ≈ $
                       {parseFloat(receiveValue).toLocaleString(undefined, {
                         maximumFractionDigits: 2,
                       })}
@@ -313,24 +304,24 @@ const Swap: React.FC<SwapProps> = () => {
                 }}
                 className="w-full overflow-hidden"
               >
-                <div className="bg-white w-full rounded-t-[30px] border-t border-x border-gray-100 p-6">
-                  <label className="block text-2xl font-medium text-gray-700 mb-3">
+                <div className="bg-white/10 w-full rounded-[30px] border-t border-x border-gray-700/40 p-6">
+                  <label className="block text-lg font-medium text-white mb-3">
                     Fees & Rate
                   </label>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                      <span className="text-sm text-gray-600">Fee (Bips)</span>
-                      <span className="text-sm font-medium text-gray-900">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 border-b border-gray-700/40">
+                      <span className="text-sm text-gray-300">Fee (Bips)</span>
+                      <span className="text-sm font-medium text-white">
                         {quote.result[0].feeBips} bips
                       </span>
                     </div>
 
                     {sendAmount && parseFloat(sendAmount) > 0 && (
-                      <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                        <span className="text-sm text-gray-600">
+                      <div className="flex items-center justify-between py-2 border-b border-gray-700/40">
+                        <span className="text-sm text-gray-300">
                           Fee ({fromAsset.asset.symbol})
                         </span>
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-white">
                           {(
                             (parseFloat(sendAmount) * quote.result[0].feeBips) /
                             10000
@@ -345,9 +336,9 @@ const Swap: React.FC<SwapProps> = () => {
                     )}
 
                     {sendValue && parseFloat(sendValue) > 0 && (
-                      <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                        <span className="text-sm text-gray-600">Fee (USD)</span>
-                        <span className="text-sm font-medium text-gray-900">
+                      <div className="flex items-center justify-between py-2 border-b border-gray-700/40">
+                        <span className="text-sm text-gray-300">Fee (USD)</span>
+                        <span className="text-sm font-medium text-white">
                           $
                           {(
                             (parseFloat(sendValue) * quote.result[0].feeBips) /
@@ -364,8 +355,8 @@ const Swap: React.FC<SwapProps> = () => {
                       parseFloat(sendAmount) > 0 &&
                       receiveAmount && (
                         <div className="flex items-center justify-between py-2">
-                          <span className="text-sm text-gray-600">Rate</span>
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm text-gray-300">Rate</span>
+                          <span className="text-sm font-medium text-white">
                             1 {fromAsset.asset.symbol} ={" "}
                             {(
                               parseFloat(receiveAmount) / parseFloat(sendAmount)
@@ -380,21 +371,14 @@ const Swap: React.FC<SwapProps> = () => {
             )}
         </AnimatePresence>
       </div>
-      <Image
-        src="/bottomrectangle.png"
-        alt="bottomrectangle"
-        className="w-full h-10"
-        height={200}
-        width={576}
-      />
-
       {orderError && (
-        <div className="w-full mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <p className="text-sm text-red-800 font-medium">{orderError}</p>
+        <div className="w-full mb-4 p-4 bg-red-900/20 border border-red-500/40 rounded-xl">
+          <p className="text-sm text-red-300 font-medium">{orderError}</p>
         </div>
       )}
 
-      <SlideToConfirmButton
+      <button
+        onClick={handleConfirm}
         disabled={
           !fromAsset ||
           !toAsset ||
@@ -407,19 +391,37 @@ const Swap: React.FC<SwapProps> = () => {
           !getWalletAddress(fromAsset) ||
           !getWalletAddress(toAsset)
         }
-        isLoading={isLoading || isQuoteLoading || isCreatingOrder}
-        loadingText={
-          isLoading
-            ? "Loading Assets..."
-            : isQuoteLoading
-            ? "Getting Quote..."
-            : isCreatingOrder
-            ? "Creating Order..."
-            : "Processing..."
-        }
-        confirmText="Confirm Swap"
-        onConfirm={handleConfirm}
-      />
+        className={`w-full mt-4 py-4 px-6 rounded-full font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+          isLoading || isQuoteLoading || isCreatingOrder
+            ? "bg-purple-600/50 text-white cursor-wait"
+            : !fromAsset ||
+              !toAsset ||
+              !sendAmount ||
+              !quote ||
+              !receiveAmount ||
+              !getWalletAddress(fromAsset) ||
+              !getWalletAddress(toAsset)
+            ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
+            : "bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 cursor-pointer active:scale-95"
+        }`}
+      >
+        {isLoading || isQuoteLoading || isCreatingOrder ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span>
+              {isLoading
+                ? "Loading Assets..."
+                : isQuoteLoading
+                ? "Getting Quote..."
+                : isCreatingOrder
+                ? "Creating Order..."
+                : "Processing..."}
+            </span>
+          </>
+        ) : (
+          "Confirm Swap"
+        )}
+      </button>
     </div>
   );
 };
