@@ -9,10 +9,9 @@ const geistSans = Inter({
 });
 
 export const metadata: Metadata = {
-  title:
-    "AVAX Bridge - Move Bitcoin Without Trust | 30-Second Cross-Chain Swaps",
+  title: "Oryn - No Approval Cross-Chain Bridge | Secure Cross-Chain Swaps",
   description:
-    "Swap assets between Bitcoin and any EVM chain in 30 seconds. Trustless, secure, and non-custodial cross-chain bridge powered by HTLC atomic swaps. Zero approvals required.",
+    "Bridge assets across chains in 30 seconds. No unlimited approvals, no trust required. Secure, non-custodial cross-chain bridge with minimal risk compared to traditional bridges.",
 };
 
 export default function RootLayout({

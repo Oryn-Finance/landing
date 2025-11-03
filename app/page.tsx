@@ -16,7 +16,6 @@ import {
   Rocket,
   ArrowRight,
   CheckCircle2,
-  Bitcoin,
   TrendingUp,
   Layers,
   Sparkles,
@@ -187,12 +186,9 @@ const CHAIN_LOGOS: Record<string, string> = {
     "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
   "Avalanche Testnet":
     "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  "Bitcoin Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
   "Starknet Sepolia":
     "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
   Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
   Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
   Ethereum: "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png",
   Polygon: "https://s2.coinmarketcap.com/static/img/coins/64x64/3890.png",
@@ -230,7 +226,6 @@ function getChainLogo(chainName: string, size: "sm" | "md" | "lg" = "md") {
 
 export default function Home() {
   const [chains, setChains] = useState<Chain[]>([]);
-  const { fetchAssets } = useAssetsStore();
 
   // Fetch chains on mount
   useEffect(() => {
@@ -386,8 +381,12 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.3 }}
               >
-                <span className="block text-white mb-2">Move Bitcoin</span>
-                <span className="block font-medium">Without Trust</span>
+                <span className="block text-white mb-2">
+                  Cross-Chain Bridge
+                </span>
+                <span className="block font-medium">
+                  Without Unlimited Approvals
+                </span>
               </motion.h1>
 
               <motion.p
@@ -396,19 +395,19 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.4 }}
               >
-                Where Bitcoin moves at{" "}
-                <span className="font-medium">Avalanche speed</span>
+                Bridge assets across chains{" "}
+                <span className="font-medium">in 30 seconds</span>
               </motion.p>
 
               <motion.p
-                className="text-base text-gray-200 leading-relaxed max-w-2xl"
+                className="text-base text-gray-200 leading-relaxed max-w-2xl mx-auto"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.5 }}
               >
-                Deposit to your account—no wallet connection or approvals
-                needed. Built for the future of DeFi—faster, safer, and more
-                decentralized than traditional bridges.
+                No unlimited token approvals. Lower risk than traditional
+                bridges. Built for secure, trustless cross-chain swaps—faster
+                and safer than approval-based bridges.
               </motion.p>
 
               <motion.div
@@ -473,8 +472,8 @@ export default function Home() {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              Bridge Bitcoin and any EVM asset across chains in 30 seconds.
-              Powered by HTLC atomic swaps—no trust required.
+              Bridge any EVM asset across chains in 30 seconds. No unlimited
+              approvals—lower risk than traditional bridges.
             </motion.p>
           </div>
 
@@ -542,7 +541,7 @@ export default function Home() {
                 icon: Network,
                 title: "Multi-Chain Support",
                 description:
-                  "Bridge between Bitcoin, Avalanche, Ethereum, and more.",
+                  "Bridge between Avalanche, Ethereum, Polygon, and more.",
               },
               {
                 icon: Lock,
@@ -582,69 +581,6 @@ export default function Home() {
                   </p>
                 </div>
               </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Key Features */}
-      <section className="relative py-24 px-4 sm:px-6 lg:px-8 z-10 bg-white/5">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            className="text-center mb-12"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <h2 className="text-4xl sm:text-5xl font-light mb-3 text-white tracking-tight">
-              Key Features
-            </h2>
-            <p className="text-lg text-gray-200 font-light">
-              Everything you need for fast, secure cross-chain swaps
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              {
-                icon: Zap,
-                title: "Lightning Fast",
-                desc: "30-second swaps vs 5-30 minutes for traditional bridges",
-              },
-              {
-                icon: ShieldCheck,
-                title: "HTLC Atomic Swaps",
-                desc: "Cryptographically secure, trustless transactions guaranteed",
-              },
-              {
-                icon: Globe2,
-                title: "Multi-Chain Support",
-                desc: "Bridge between Bitcoin and any EVM-compatible chain",
-              },
-              {
-                icon: Lock,
-                title: "Non-Custodial",
-                desc: "Self-custody design—you control your keys at all times",
-              },
-              {
-                icon: Network,
-                title: "Fully Decentralized",
-                desc: "No intermediaries, no single point of failure",
-              },
-              {
-                icon: Sparkles,
-                title: "No Approvals Needed",
-                desc: "Deposit-based model—no wallet approvals or connection requirements",
-              },
-            ].map((feature, index) => (
-              <FeatureCard
-                key={index}
-                icon={feature.icon}
-                title={feature.title}
-                description={feature.desc}
-                delay={index * 0.1}
-              />
             ))}
           </div>
         </div>
@@ -779,9 +715,8 @@ export default function Home() {
                   </motion.div>
                 ))
               ) : (
-                // Loading state or fallback
                 <>
-                  {["bitcoin", "ethereum", "avalanche", "polygon"].map(
+                  {["ethereum", "avalanche", "bitcoin", "polygon"].map(
                     (asset, index) => (
                       <motion.div
                         key={asset}
@@ -792,9 +727,6 @@ export default function Home() {
                         transition={{ duration: 0.6, delay: index * 0.1 }}
                       >
                         <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/80 border border-white/20 flex items-center justify-center backdrop-blur-sm">
-                          {asset === "bitcoin" && (
-                            <Bitcoin className="w-7 h-7 md:w-8 md:h-8 text-orange-400" />
-                          )}
                           {asset === "ethereum" && (
                             <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
                               <span className="text-white font-bold text-xs md:text-sm">
@@ -810,6 +742,13 @@ export default function Home() {
                               height={32}
                               className="w-7 h-7 md:w-8 md:h-8 rounded-full"
                             />
+                          )}
+                          {asset === "bitcoin" && (
+                            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                              <span className="text-white font-bold text-xs md:text-sm">
+                                B
+                              </span>
+                            </div>
                           )}
                           {asset === "polygon" && (
                             <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-purple-500 flex items-center justify-center">
@@ -877,11 +816,11 @@ export default function Home() {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-4xl sm:text-5xl md:text-6xl font-light text-white mb-4 tracking-tight">
-              Bridge across <span className="text-purple-300">4+ assets</span>{" "}
+              Bridge across <span className="text-purple-300">3+ assets</span>{" "}
               and chains
             </h2>
             <p className="text-lg md:text-xl text-gray-300 font-light">
-              Swap Bitcoin, Ethereum, Avalanche, and more across any supported
+              Swap Ethereum, Avalanche, Polygon, and more across any supported
               blockchain. Pick your assets and bridge instantly.
             </p>
           </motion.div>
@@ -1036,12 +975,12 @@ export default function Home() {
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  "Bitcoin Script",
                   "Solidity Smart Contracts",
                   "Avalanche C-Chain",
-                  "UDP Protocol",
-                  "HTLC Atomic Swaps",
+                  "EVM Compatible",
+                  "HTLC Technology",
                   "Optimized Routing",
+                  "Zero Approval System",
                 ].map((tech, index) => (
                   <div
                     key={index}
@@ -1055,9 +994,9 @@ export default function Home() {
                 ))}
               </div>
               <p className="text-sm text-gray-200 mt-4 leading-relaxed">
-                Our architecture combines Bitcoin&apos;s security with EVM chain
-                flexibility, enabling seamless cross-chain transactions without
-                compromising on decentralization.
+                Our architecture uses HTLC technology with EVM compatibility,
+                enabling seamless cross-chain transactions without unlimited
+                approvals, reducing risk compared to traditional bridges.
               </p>
             </motion.div>
           </div>
@@ -1170,7 +1109,7 @@ export default function Home() {
               {
                 icon: TrendingUp,
                 title: "DeFi Trading",
-                desc: "Quickly move Bitcoin to EVM chains for DeFi opportunities and yield farming",
+                desc: "Quickly move assets across EVM chains for DeFi opportunities and yield farming",
               },
               {
                 icon: Layers,
@@ -1180,7 +1119,7 @@ export default function Home() {
               {
                 icon: Coins,
                 title: "Fast Payments",
-                desc: "Use Bitcoin for payments on EVM chains with lightning-fast settlement",
+                desc: "Fast cross-chain payments with lightning-fast settlement and no unlimited approvals",
               },
             ].map((useCase, index) => (
               <FeatureCard
@@ -1233,7 +1172,7 @@ export default function Home() {
                   },
                   {
                     q: "What chains are supported?",
-                    a: "We support Bitcoin, Avalanche, Ethereum, Polygon, and Arbitrum, with more chains coming soon.",
+                    a: "We support Avalanche, Ethereum, Polygon, Arbitrum, and more EVM chains, with additional networks coming soon.",
                   },
                   {
                     q: "Do I need to connect my wallet or approve transactions?",
@@ -1310,14 +1249,14 @@ export default function Home() {
                         }}
                       >
                         <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center border-4 border-orange-300/30 shadow-2xl shadow-orange-500/30">
-                          <Bitcoin className="w-12 h-12 text-white" />
+                          <Network className="w-12 h-12 text-white" />
                         </div>
                         <motion.div
-                          className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-400"
+                          className="absolute -bottom-4 text-nowrap left-1/2 -translate-x-1/2 text-xs font-bold text-gray-400"
                           animate={{ opacity: [0.5, 1, 0.5] }}
                           transition={{ duration: 2, repeat: Infinity }}
                         >
-                          Bitcoin
+                          Cross-Chain
                         </motion.div>
                       </motion.div>
 
@@ -1458,7 +1397,7 @@ export default function Home() {
             />
             <div className="relative z-10">
               <motion.h2 className="text-3xl sm:text-4xl font-light text-white mb-4 tracking-tight">
-                Ready to Bridge Bitcoin{" "}
+                Ready to Bridge Assets{" "}
                 <span className="font-medium">Without Trust?</span>
               </motion.h2>
               <p className="text-base text-purple-100 mb-8 font-light">
@@ -1515,8 +1454,8 @@ export default function Home() {
                 />
               </motion.div>
               <p className="text-sm text-gray-300 leading-relaxed">
-                Move Bitcoin without trust. Fast, secure, non-custodial
-                cross-chain swaps.
+                Move assets without unlimited approvals. Fast, secure,
+                non-custodial cross-chain swaps.
               </p>
             </div>
             {["Product", "Resources", "Community"].map((category, index) => (

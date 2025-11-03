@@ -32,7 +32,7 @@ const Swap: React.FC<SwapProps> = () => {
     createOrder,
   } = useAssetsStore();
 
-  const { evmWallet, btcWallet, starknetWallet } = useWalletStore();
+  const { evmWallet, starknetWallet } = useWalletStore();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<"from" | "to" | null>(
     null
@@ -54,12 +54,6 @@ const Swap: React.FC<SwapProps> = () => {
     setIsDropdownOpen(null);
   };
 
-  // Helper function to determine if a chain is Bitcoin-based
-  const isBitcoinChain = (chainId: string, chainName: string): boolean => {
-    const identifier = `${chainId}${chainName}`.toLowerCase();
-    return identifier.includes("bitcoin") || identifier.includes("btc");
-  };
-
   // Helper function to determine if a chain is Starknet-based
   const isStarknetChain = (chainId: string, chainName: string): boolean => {
     const identifier = `${chainId}${chainName}`.toLowerCase();
@@ -69,11 +63,8 @@ const Swap: React.FC<SwapProps> = () => {
   // Get wallet address for a given chain
   const getWalletAddress = (asset: typeof fromAsset): string | null => {
     if (!asset) return null;
-    const isBTC = isBitcoinChain(asset.chainId, asset.chainName);
     const isStark = isStarknetChain(asset.chainId, asset.chainName);
-    if (isBTC) {
-      return btcWallet?.isConnected ? btcWallet.address : null;
-    } else if (isStark) {
+    if (isStark) {
       return starknetWallet?.isConnected ? starknetWallet.address : null;
     } else {
       return evmWallet?.isConnected ? evmWallet.address : null;
@@ -91,7 +82,6 @@ const Swap: React.FC<SwapProps> = () => {
 
     const getWalletType = (asset: typeof fromAsset): string => {
       if (!asset) return "wallet";
-      if (isBitcoinChain(asset.chainId, asset.chainName)) return "Bitcoin";
       if (isStarknetChain(asset.chainId, asset.chainName)) return "Starknet";
       return "EVM";
     };
@@ -99,8 +89,8 @@ const Swap: React.FC<SwapProps> = () => {
     if (!sourceAddress) {
       setOrderError(
         `Please connect your ${
-          isBitcoinChain(fromAsset.chainId, fromAsset.chainName)
-            ? "Bitcoin"
+          isStarknetChain(fromAsset.chainId, fromAsset.chainName)
+            ? "Starknet"
             : "EVM"
         } wallet for the source chain`
       );
@@ -110,7 +100,9 @@ const Swap: React.FC<SwapProps> = () => {
     if (!destinationAddress) {
       setOrderError(
         `Please connect your ${
-          isBitcoinChain(toAsset.chainId, toAsset.chainName) ? "Bitcoin" : "EVM"
+          isStarknetChain(toAsset.chainId, toAsset.chainName)
+            ? "Starknet"
+            : "EVM"
         } wallet for the destination chain`
       );
       return;

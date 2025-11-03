@@ -1,12 +1,24 @@
 "use client";
 
 import { WagmiProvider, createConfig, http } from "wagmi";
-import { avalanche, avalancheFuji, mainnet, sepolia, arbitrumSepolia } from "wagmi/chains";
+import {
+  avalanche,
+  avalancheFuji,
+  mainnet,
+  sepolia,
+  arbitrumSepolia,
+} from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { injected, metaMask } from "wagmi/connectors";
 
 // Configure supported chains
-const supportedChains = [avalanche, avalancheFuji, mainnet, sepolia, arbitrumSepolia] as const;
+const supportedChains = [
+  avalanche,
+  avalancheFuji,
+  mainnet,
+  sepolia,
+  arbitrumSepolia,
+] as const;
 
 // Create query client
 const queryClient = new QueryClient({
@@ -44,4 +56,3 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     </WagmiProvider>
   );
 }
-

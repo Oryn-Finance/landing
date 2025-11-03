@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { X, Clock, AlertCircle, ArrowRight, RefreshCw } from "lucide-react";
 import { useAccount } from "wagmi";
-import { useWalletStore } from "../store/walletStore";
 import Image from "next/image";
 import { API_URLS } from "@/constants/constants";
 
@@ -109,7 +108,6 @@ const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
 }) => {
   const router = useRouter();
   const { address: evmAddress } = useAccount();
-  const { btcWallet } = useWalletStore();
 
   const [isLoading, setIsLoading] = useState(false);
   const [orders, setOrders] = useState<
@@ -127,13 +125,13 @@ const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
 
   // Fetch orders
   const fetchOrders = async () => {
-    if (!evmAddress && !btcWallet?.address) return;
+    if (!evmAddress) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const userAddress = evmAddress || btcWallet?.address;
+      const userAddress = evmAddress;
       if (!userAddress) return;
 
       const fetchedOrders = await fetchUserOrders(userAddress);
@@ -179,7 +177,7 @@ const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, evmAddress, btcWallet?.address]);
+  }, [isOpen, evmAddress]);
 
   const getAssetSymbol = (assetValue: string) => {
     const parts = assetValue.split(":");

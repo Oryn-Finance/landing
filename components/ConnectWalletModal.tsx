@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAccount, useDisconnect, useConnect } from "wagmi";
-import { useWalletStore } from "../store/walletStore";
+import { useConnect } from "wagmi";
 import { X, Zap } from "lucide-react";
 import Image from "next/image";
 
@@ -12,10 +11,8 @@ interface ConnectWalletModalProps {
   open: boolean;
   onClose: () => void;
   onEVMConnect: (connector: any) => void;
-  onBTCConnect: (wallet: any) => void;
   onStarknetConnect: (wallet: any) => void;
   loadingEVM: boolean;
-  loadingBTC: boolean;
   loadingStarknet: boolean;
 }
 
@@ -32,14 +29,12 @@ export function ConnectWalletModal({
   open,
   onClose,
   onEVMConnect,
-  onBTCConnect,
   onStarknetConnect,
   loadingEVM,
-  loadingBTC,
   loadingStarknet,
 }: ConnectWalletModalProps) {
   const { connectors } = useConnect();
-  const [activeTab, setActiveTab] = useState<"evm" | "btc" | "starknet">("evm");
+  const [activeTab, setActiveTab] = useState<"evm" | "starknet">("evm");
 
   const handleEVMConnect = async (connector: any) => {
     try {
@@ -49,23 +44,10 @@ export function ConnectWalletModal({
     }
   };
 
-  const handleBTCConnect = async (wallet: any) => {
-    try {
-      await onBTCConnect(wallet);
-    } catch (error) {
-      console.error("Failed to connect BTC wallet:", error);
-    }
-  };
-
   const getEVMIcon = (connector: any) => {
     if (!connector?.name) return undefined;
     const key = connector.name.toLowerCase();
     return WALLET_ICONS[key];
-  };
-
-  const getBTCIcon = (walletName: string) => {
-    const name = walletName.toLowerCase();
-    return WALLET_ICONS[name];
   };
 
   const handleStarknetConnect = async (wallet: any) => {
@@ -174,42 +156,6 @@ export function ConnectWalletModal({
     },
   ];
 
-  // Bitcoin wallet list
-  const bitcoinWallets = [
-    {
-      id: "okx-btc",
-      name: "OKX Wallet",
-      description: "Connect your Bitcoin wallet",
-      available:
-        typeof window !== "undefined" &&
-        typeof (window as any).okxwallet !== "undefined",
-    },
-    {
-      id: "unisat",
-      name: "Unisat wallet",
-      description: "Connect your Bitcoin wallet",
-      available:
-        typeof window !== "undefined" &&
-        typeof (window as any).unisat !== "undefined",
-    },
-    {
-      id: "xverse",
-      name: "Xverse Wallet",
-      description: "Connect your Bitcoin wallet",
-      available:
-        typeof window !== "undefined" &&
-        typeof (window as any).XverseProviders !== "undefined",
-    },
-    {
-      id: "hiro",
-      name: "Hiro Wallet",
-      description: "Connect your Bitcoin wallet",
-      available:
-        typeof window !== "undefined" &&
-        typeof (window as any).btc !== "undefined",
-    },
-  ];
-
   const modalContent = (
     <AnimatePresence>
       {open && (
@@ -286,16 +232,6 @@ export function ConnectWalletModal({
                 </button>
                 <button
                   className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
-                    activeTab === "btc"
-                      ? "bg-orange-500/20 text-orange-300 border-b-2 border-orange-500"
-                      : "bg-white/5 text-gray-400 border-b-2 border-transparent hover:bg-white/10 hover:text-gray-300"
-                  }`}
-                  onClick={() => setActiveTab("btc")}
-                >
-                  Bitcoin Wallets
-                </button>
-                <button
-                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
                     activeTab === "starknet"
                       ? "bg-purple-500/20 text-purple-300 border-b-2 border-purple-500"
                       : "bg-white/5 text-gray-400 border-b-2 border-transparent hover:bg-white/10 hover:text-gray-300"
@@ -356,17 +292,17 @@ export function ConnectWalletModal({
                   </div>
                 )}
 
-                {/* Bitcoin Wallets - Only show when Bitcoin tab is active */}
-                {activeTab === "btc" && (
+                {/* Starknet Wallets - Only show when Starknet tab is active */}
+                {activeTab === "starknet" && (
                   <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 md:gap-3">
-                    {bitcoinWallets && bitcoinWallets.length > 0 ? (
-                      bitcoinWallets.map((wallet: any, index: number) => {
-                        const iconUrl = getBTCIcon(wallet.name);
+                    {starknetWallets && starknetWallets.length > 0 ? (
+                      starknetWallets.map((wallet: any, index: number) => {
+                        const iconUrl = getStarknetIcon(wallet.name);
                         return (
                           <motion.button
                             key={wallet.id || index}
-                            onClick={() => handleBTCConnect(wallet)}
-                            disabled={loadingBTC || !wallet.available}
+                            onClick={() => handleStarknetConnect(wallet)}
+                            disabled={loadingStarknet || !wallet.available}
                             className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <div className="w-10 h-10 rounded-lg flex items-center justify-center">
@@ -395,9 +331,6 @@ export function ConnectWalletModal({
                                   "Connect your Bitcoin wallet"}
                               </p>
                             </div>
-                            {loadingBTC && (
-                              <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-                            )}
                           </motion.button>
                         );
                       })

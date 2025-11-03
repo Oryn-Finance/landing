@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -333,7 +335,10 @@ export default function OrderDetailsPage() {
     // Determine if we should continue polling based on order state
     const shouldPoll = (orderData: Order): boolean => {
       // Stop polling if order is completed (check for claim_tx first)
-      if (orderData.destination_intent.transactions.claim_tx) {
+      if (
+        orderData.source_intent.transactions.claim_tx ||
+        orderData.destination_intent.transactions.claim_tx
+      ) {
         return false;
       }
 
@@ -361,15 +366,24 @@ export default function OrderDetailsPage() {
         return !orderData.source_intent.transactions.create_tx;
       }
 
-      // For awaiting_redeem: poll until destination_intent.transactions.create_tx has a tx hash
-      // This applies when destination state indicates we're awaiting redeem, or source has create_tx but destination doesn't
+      // For awaiting_redeem/redeeming: poll until claim_tx appears
+      // This applies when:
+      // 1. Destination state indicates we're awaiting redeem or redeeming
+      // 2. Source has create_tx (deposit detected) but we don't have claim_tx yet
+      const hasDeposit =
+        orderData.source_intent.transactions.create_tx ||
+        orderData.destination_intent.transactions.create_tx;
+      const hasClaim =
+        orderData.source_intent.transactions.claim_tx ||
+        orderData.destination_intent.transactions.claim_tx;
+
       if (
         destState === "awaiting_redeem" ||
         destState === "redeeming" ||
-        (orderData.source_intent.transactions.create_tx &&
-          !orderData.destination_intent.transactions.create_tx)
+        (hasDeposit && !hasClaim)
       ) {
-        return !orderData.destination_intent.transactions.create_tx;
+        // Continue polling until we get a claim_tx
+        return !hasClaim;
       }
 
       // Stop polling for completed or other states
@@ -670,6 +684,87 @@ export default function OrderDetailsPage() {
     chainId,
   ]);
 
+  // Single function to parse and simplify all error messages
+  const parsePaymentError = (error: Error | string | null): string => {
+    if (!error) return "An error occurred";
+
+    const errorMessage =
+      typeof error === "string" ? error : error.message || error.toString();
+
+    // User rejected transaction
+    if (
+      errorMessage.toLowerCase().includes("user rejected") ||
+      errorMessage.toLowerCase().includes("user denied") ||
+      errorMessage.toLowerCase().includes("user cancelled")
+    ) {
+      return "Transaction cancelled";
+    }
+
+    // Chain/network issues
+    if (
+      errorMessage.toLowerCase().includes("chain") &&
+      errorMessage.toLowerCase().includes("undefined")
+    ) {
+      return "Switch to correct network";
+    }
+
+    if (
+      errorMessage.toLowerCase().includes("network") ||
+      errorMessage.toLowerCase().includes("chain mismatch") ||
+      errorMessage.toLowerCase().includes("unsupported chain")
+    ) {
+      return "Wrong network selected";
+    }
+
+    // Insufficient balance
+    if (
+      errorMessage.toLowerCase().includes("insufficient") ||
+      errorMessage.toLowerCase().includes("balance") ||
+      errorMessage.toLowerCase().includes("funds")
+    ) {
+      return "Insufficient balance";
+    }
+
+    // Transaction reverted
+    if (
+      errorMessage.toLowerCase().includes("revert") ||
+      errorMessage.toLowerCase().includes("reverted")
+    ) {
+      return "Transaction failed";
+    }
+
+    // Generic wallet errors
+    if (
+      errorMessage.toLowerCase().includes("wallet") ||
+      errorMessage.toLowerCase().includes("metamask")
+    ) {
+      return "Wallet error. Please try again";
+    }
+
+    // Contract errors
+    if (errorMessage.toLowerCase().includes("contract")) {
+      return "Contract call failed";
+    }
+
+    // Timeout errors
+    if (errorMessage.toLowerCase().includes("timeout")) {
+      return "Request timed out";
+    }
+
+    // Extract first meaningful line (max 80 chars)
+    const lines = errorMessage
+      .split("\n")
+      .filter((line) => line.trim().length > 0);
+    const firstLine = lines[0] || errorMessage;
+
+    // If error is too long, return generic message
+    if (firstLine.length > 80) {
+      return "Transaction failed";
+    }
+
+    return firstLine.trim();
+  };
+
   // Handle payment transaction
   const handlePayment = async () => {
     if (!order || !isConnected || !address) {
@@ -693,7 +788,10 @@ export default function OrderDetailsPage() {
       try {
         await switchChain({ chainId: requiredChainId });
       } catch (switchError) {
-        setPaymentError("Failed to switch chain. Please switch manually.");
+        const error =
+          switchError instanceof Error ? switchError : String(switchError);
+        setPaymentError(parsePaymentError(error));
+        setIsPaying(false);
         return;
       }
     }
@@ -722,9 +820,8 @@ export default function OrderDetailsPage() {
       }
     } catch (err) {
       console.error("Failed to send payment:", err);
-      setPaymentError(
-        err instanceof Error ? err.message : "Failed to send payment"
-      );
+      const error = err instanceof Error ? err : String(err);
+      setPaymentError(parsePaymentError(error));
       setIsPaying(false);
     }
   };
@@ -737,7 +834,7 @@ export default function OrderDetailsPage() {
       // Refresh order after payment
       setTimeout(() => fetchOrder(), 2000);
     } else if (paymentReceipt && paymentReceipt.status === "reverted") {
-      setPaymentError("Transaction reverted. Please try again.");
+      setPaymentError(parsePaymentError("Transaction reverted"));
       setIsPaying(false);
     }
   }, [paymentReceipt]);
@@ -753,7 +850,7 @@ export default function OrderDetailsPage() {
       nativePaymentReceipt &&
       nativePaymentReceipt.status === "reverted"
     ) {
-      setPaymentError("Transaction reverted. Please try again.");
+      setPaymentError(parsePaymentError("Transaction reverted"));
       setIsPaying(false);
     }
   }, [nativePaymentReceipt]);
@@ -761,11 +858,11 @@ export default function OrderDetailsPage() {
   // Handle payment transaction errors
   useEffect(() => {
     if (paymentTxError) {
-      setPaymentError(paymentTxError.message || "Failed to send transaction");
+      setPaymentError(parsePaymentError(paymentTxError));
       setIsPaying(false);
     }
     if (nativeTxError) {
-      setPaymentError(nativeTxError.message || "Failed to send transaction");
+      setPaymentError(parsePaymentError(nativeTxError));
       setIsPaying(false);
     }
   }, [paymentTxError, nativeTxError]);

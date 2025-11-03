@@ -1,13 +1,14 @@
 import { trim0x } from "./redeem";
 
 export class DigestKey {
-  private static readonly STORAGE_KEY = 'avax_digest_key';
+  private static readonly STORAGE_KEY = "avax_digest_key";
 
   private static isValidPrivateKey(privateKey: string): boolean {
-    const bn = BigInt('0x' + privateKey);
-    const min = 1n;
+    const bn = BigInt("0x" + privateKey);
+    //ignore-eslint-disable-next-line
+    const min = BigInt(1);
     const max = BigInt(
-      '0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141',
+      "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"
     );
     return bn >= min && bn < max;
   }
@@ -16,7 +17,7 @@ export class DigestKey {
     const randomBytes = new Uint8Array(32);
     crypto.getRandomValues(randomBytes);
 
-    const privateKey = trim0x(Buffer.from(randomBytes).toString('hex'));
+    const privateKey = trim0x(Buffer.from(randomBytes).toString("hex"));
 
     return DigestKey.isValidPrivateKey(privateKey)
       ? privateKey
@@ -26,7 +27,7 @@ export class DigestKey {
   public static getDigestKey(): string {
     // Try to get from localStorage first
     const storedKey = localStorage.getItem(this.STORAGE_KEY);
-    
+
     if (storedKey && this.isValidPrivateKey(storedKey)) {
       return storedKey;
     }
@@ -39,7 +40,7 @@ export class DigestKey {
 
   public static setDigestKey(privateKey: string): void {
     if (!this.isValidPrivateKey(privateKey)) {
-      throw new Error('Invalid private key provided');
+      throw new Error("Invalid private key provided");
     }
     localStorage.setItem(this.STORAGE_KEY, privateKey);
   }

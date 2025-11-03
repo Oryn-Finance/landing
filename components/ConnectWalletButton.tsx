@@ -19,18 +19,15 @@ export function ConnectWalletButton({
 }: ConnectWalletButtonProps = {}) {
   const [modalOpen, setModalOpen] = useState(false);
   const [loadingEVM, setLoadingEVM] = useState(false);
-  const [loadingBTC, setLoadingBTC] = useState(false);
   const [loadingStarknet, setLoadingStarknet] = useState(false);
 
   const { address, isConnected, chainId } = useAccount();
   const { disconnect } = useDisconnect();
-  const { connectors, connect } = useConnect();
+  const { connect } = useConnect();
   const {
     evmWallet,
-    btcWallet,
     starknetWallet,
     setEVMWallet,
-    setBTCWallet,
     setStarknetWallet,
     disconnectEVM,
   } = useWalletStore();
@@ -57,71 +54,6 @@ export function ConnectWalletButton({
       console.error("Failed to connect EVM wallet:", error);
     } finally {
       setLoadingEVM(false);
-    }
-  };
-
-  const handleBTCConnect = async (wallet: any) => {
-    setLoadingBTC(true);
-    try {
-      if (typeof window !== "undefined") {
-        if (
-          wallet.id === "unisat" &&
-          typeof (window as any).unisat !== "undefined"
-        ) {
-          const unisat = (window as any).unisat;
-          const accounts = await unisat.requestAccounts();
-          if (accounts && accounts.length > 0) {
-            setBTCWallet({
-              address: accounts[0],
-              isConnected: true,
-            });
-            setModalOpen(false);
-          }
-        } else if (
-          wallet.id === "xverse" &&
-          typeof (window as any).XverseProviders !== "undefined"
-        ) {
-          const provider = (window as any).XverseProviders;
-          const accounts = await provider.requestAccounts();
-          if (accounts && accounts.length > 0) {
-            setBTCWallet({
-              address: accounts[0],
-              isConnected: true,
-            });
-            setModalOpen(false);
-          }
-        } else if (
-          wallet.id === "hiro" &&
-          typeof (window as any).btc !== "undefined"
-        ) {
-          const hiro = (window as any).btc;
-          const response = await hiro.request("requestAccount");
-          if (response && response.result) {
-            setBTCWallet({
-              address: response.result,
-              isConnected: true,
-            });
-            setModalOpen(false);
-          }
-        } else if (
-          wallet.id === "okx-btc" &&
-          typeof (window as any).okxwallet !== "undefined"
-        ) {
-          const okx = (window as any).okxwallet;
-          const accounts = await okx.requestAccounts();
-          if (accounts && accounts.length > 0) {
-            setBTCWallet({
-              address: accounts[0],
-              isConnected: true,
-            });
-            setModalOpen(false);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Failed to connect BTC wallet:", error);
-    } finally {
-      setLoadingBTC(false);
     }
   };
 
@@ -182,14 +114,11 @@ export function ConnectWalletButton({
   };
 
   const isAnyWalletConnected =
-    (isConnected && evmWallet) ||
-    btcWallet?.isConnected ||
-    starknetWallet?.isConnected;
+    (isConnected && evmWallet) || starknetWallet?.isConnected;
 
   const handleCloseModal = () => {
     setModalOpen(false);
     setLoadingEVM(false);
-    setLoadingBTC(false);
     setLoadingStarknet(false);
   };
 
@@ -202,9 +131,6 @@ export function ConnectWalletButton({
     if (isConnected) {
       disconnect();
       disconnectEVM();
-    }
-    if (btcWallet?.isConnected) {
-      setBTCWallet({ address: "", isConnected: false });
     }
     if (starknetWallet?.isConnected) {
       setStarknetWallet({ address: "", isConnected: false });
@@ -260,26 +186,6 @@ export function ConnectWalletButton({
                 </motion.div>
               )}
 
-              {/* Bitcoin Wallet Badge */}
-              {btcWallet?.isConnected && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-1.5 px-2 py-1 bg-white/5 backdrop-blur-sm border border-orange-500/20 rounded-lg text-xs font-medium text-orange-300/90"
-                >
-                  <Image
-                    src="/bitcoin-btc-logo.svg"
-                    alt="bitcoin"
-                    width={14}
-                    height={14}
-                    className="rounded-full"
-                  />
-                  <span className="font-mono">
-                    {formatAddress(btcWallet.address)}
-                  </span>
-                </motion.div>
-              )}
-
               {/* Starknet Wallet Badge */}
               {starknetWallet?.isConnected && (
                 <motion.div
@@ -307,7 +213,6 @@ export function ConnectWalletButton({
               {!(
                 isConnected &&
                 evmWallet?.isConnected &&
-                btcWallet?.isConnected &&
                 starknetWallet?.isConnected
               ) && (
                 <motion.button
@@ -361,10 +266,8 @@ export function ConnectWalletButton({
         open={modalOpen}
         onClose={handleCloseModal}
         onEVMConnect={handleEVMConnect}
-        onBTCConnect={handleBTCConnect}
         onStarknetConnect={handleStarknetConnect}
         loadingEVM={loadingEVM}
-        loadingBTC={loadingBTC}
         loadingStarknet={loadingStarknet}
       />
     </>
