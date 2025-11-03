@@ -26,12 +26,9 @@
     "react-icons": "^5.5.0",
     "react-intersection-observer": "^10.0.0",
     "react-qr-code": "^2.0.18",
-<<<<<<< HEAD
     "starknet": "^7.6.4",
-    "tiny-secp256k1": "^2.2.4",
-=======
     "three": "^0.181.0",
->>>>>>> e43dcea1f879b1ddd49d4e15ec1a7bf1e929697e
+    "tiny-secp256k1": "^2.2.4",
     "viem": "^2.38.6",
     "wagmi": "^2.19.2",
     "zustand": "^5.0.8"

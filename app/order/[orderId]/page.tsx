@@ -10,13 +10,12 @@ import OrdersSidebar from "../../../components/OrdersSidebar";
 import PixelBlast from "@/components/ui/PixelBlast";
 import { API_URLS } from "../../../constants/constants";
 import type { Order, OrderStatus } from "../../../types/order";
-import { ArrowLeft, Copy, CheckCircle2, Clock, Loader2, Play } from "lucide-react";
+import {  Copy, CheckCircle2, Clock, Loader2} from "lucide-react";
 import { useSignMessage, useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useSendTransaction, useWalletClient } from "wagmi";
-import { generateSecret, prepareSignMessage, storeSecret, getSecret, type SecretData } from "../../../utils/secretManager";
+import { getSecret, type SecretData } from "../../../utils/secretManager";
 import { with0x, trim0x, getChainIdFromAsset } from "../../../utils/redeem";
 import { executeRedeem, getRedeemTypeFromAsset } from "../../../utils/redeem/index";
 import { erc20Abi, type WalletClient } from "viem";
-import { ExternalLink } from "lucide-react";
 import { useAssetsStore } from "@/store/assetsStore";
 import Image from "next/image";
 
@@ -736,7 +735,7 @@ export default function OrderDetailsPage() {
     }
   }, [paymentTxHash, nativeTxHash, showPaymentModal]);
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, fieldName: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedAddress(fieldName);
@@ -952,13 +951,40 @@ export default function OrderDetailsPage() {
                         )}
                       </button>
                     </div>
-                    <div className="flex justify-center p-4 bg-white rounded-lg">
-                      <QRCodeSVG
-                        value={sourceDepositAddress}
-                        size={180}
-                        level="M"
-                        className="w-full max-w-[180px]"
-                      />
+                    <div className="flex items-center justify-center gap-4 p-4 bg-white rounded-lg">
+                      <div className="flex justify-center">
+                        <QRCodeSVG
+                          value={sourceDepositAddress}
+                          size={180}
+                          level="M"
+                          className="w-full max-w-[180px]"
+                        />
+                      </div>
+                      <div className="flex flex-col items-stretch gap-2">
+                        <button
+                          onClick={handlePayment}
+                          disabled={isPaying || !isConnected}
+                          className={`px-4 py-2 rounded-lg transition-colors text-white ${
+                            isPaying || !isConnected
+                              ? "bg-purple-600/50 cursor-not-allowed"
+                              : "bg-purple-600 hover:bg-purple-700"
+                          }`}
+                        >
+                          {isPaying ? (
+                            <span className="inline-flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Processing...
+                            </span>
+                          ) : (
+                            "Pay with connected wallet"
+                          )}
+                        </button>
+                        {paymentError && (
+                          <div className="text-xs text-red-400 max-w-[220px]">
+                            {paymentError}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <p className="text-xs text-gray-500 text-center">
                       Scan this QR code or copy the address above to send your
