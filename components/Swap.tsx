@@ -431,8 +431,11 @@ const Swap: React.FC<SwapProps> = () => {
           !fromAsset ||
           !toAsset ||
           !sendAmount ||
+          parseFloat(sendAmount) <= 0 ||
           !quote ||
+          !quote.result?.[0] ||
           !receiveAmount ||
+          receiveAmount.trim() === "" ||
           isLoading ||
           isQuoteLoading ||
           isCreatingOrder ||
@@ -445,8 +448,11 @@ const Swap: React.FC<SwapProps> = () => {
             : !fromAsset ||
               !toAsset ||
               !sendAmount ||
+              parseFloat(sendAmount) <= 0 ||
               !quote ||
+              !quote.result?.[0] ||
               !receiveAmount ||
+              receiveAmount.trim() === "" ||
               !getWalletAddress(fromAsset) ||
               !getWalletAddress(toAsset)
             ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"

@@ -10,14 +10,7 @@ import OrdersSidebar from "../../../components/OrdersSidebar";
 import PixelBlast from "@/components/ui/PixelBlast";
 import { API_URLS } from "../../../constants/constants";
 import type { Order, OrderStatus } from "../../../types/order";
-import {
-  ArrowLeft,
-  Copy,
-  CheckCircle2,
-  Clock,
-  Loader2,
-  Play,
-} from "lucide-react";
+import { Copy, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import {
   useSignMessage,
   useAccount,
@@ -26,20 +19,30 @@ import {
   useSwitchChain,
   useSendTransaction,
 } from "wagmi";
-import {
-  generateSecret,
-  prepareSignMessage,
-  storeSecret,
-  getSecret,
-  type SecretData,
-} from "../../../utils/secretManager";
-import { with0x, trim0x, getChainIdFromAsset } from "../../../utils/redeem";
-import {
-  executeRedeem,
-  getRedeemTypeFromAsset,
-} from "../../../utils/redeem/index";
-import { erc20Abi } from "viem";
-import { ExternalLink } from "lucide-react";
+import { getSecret, type SecretData } from "../../../utils/secretManager";
+import Image from "next/image";
+
+const ASSET_LOGOS: Record<string, string> = {
+  wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
+  avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
+  bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  strk: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+};
+
+const CHAIN_LOGOS: Record<string, string> = {
+  "Arbitrum Sepolia":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
+  "Avalanche Testnet":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  "Bitcoin Testnet":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  "Starknet Sepolia":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
+  Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+};
 
 // Explorer URL mapping for different chains
 const EXPLORER_URLS: Record<string, (txHash: string) => string> = {
@@ -77,20 +80,6 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   awaiting_redeem: "Awaiting Redeem",
   redeeming: "Redeeming",
   complete: "Complete",
-};
-
-const CHAIN_LOGOS: Record<string, string> = {
-  "Arbitrum Sepolia":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
-  "Avalanche Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  "Bitcoin Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  "Starknet Sepolia":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-  Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
 };
 
 function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
@@ -503,7 +492,7 @@ export default function OrderDetailsPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="w-full max-w-2xl bg-white/10 backdrop-blur-lg border border-white/50 rounded-3xl p-8 text-center"
+            className="w-full max-w-2xl bg-white/5 backdrop-blur-lg border border-white/50 rounded-3xl p-8 text-center"
           >
             <Loader2 className="w-8 h-8 animate-spin text-purple-400 mx-auto mb-4" />
             <p className="text-gray-300">Loading order details...</p>
@@ -514,7 +503,7 @@ export default function OrderDetailsPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-2xl bg-white/10 backdrop-blur-lg border border-red-500/50 rounded-3xl p-8 text-center"
+            className="w-full max-w-2xl bg-white/5 backdrop-blur-lg border border-red-500/50 rounded-3xl p-8 text-center"
           >
             <p className="text-red-300 mb-4">{error}</p>
             <button
@@ -537,10 +526,10 @@ export default function OrderDetailsPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="scale-90 origin-top rounded-3xl bg-white/10 backdrop-blur-lg border border-white/50 p-6 space-y-4"
+              className="scale-90 origin-top rounded-3xl bg-white/5 backdrop-blur-lg border border-white/10 p-6 space-y-4"
             >
               {/* Order Header - From/To Assets */}
-              <div className="bg-white/10 backdrop-blur-sm border border-gray-700/40 rounded-[30px] p-4">
+              <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
                 <h1 className="text-lg font-semibold text-white mb-4">
                   Order Details
                 </h1>
@@ -606,7 +595,7 @@ export default function OrderDetailsPage() {
 
               {/* Deposit Address & QR Code */}
               {sourceDepositAddress && (
-                <div className="bg-white/10 backdrop-blur-sm border border-gray-700/40 rounded-[30px] p-4">
+                <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
                   <h2 className="text-base font-semibold text-white mb-3">
                     Deposit Address
                   </h2>
@@ -619,7 +608,7 @@ export default function OrderDetailsPage() {
                         onClick={() =>
                           copyToClipboard(sourceDepositAddress, "deposit")
                         }
-                        className="shrink-0 p-2 hover:bg-white/10 rounded-lg transition-colors"
+                        className="shrink-0 p-2 hover:bg-white/5 rounded-lg transition-colors"
                         title="Copy address"
                       >
                         {copiedAddress === "deposit" ? (
@@ -629,7 +618,7 @@ export default function OrderDetailsPage() {
                         )}
                       </button>
                     </div>
-                    <div className="flex justify-center p-4 bg-white/5 rounded-lg">
+                    <div className="flex justify-center p-4 bg-white rounded-lg">
                       <QRCodeSVG
                         value={sourceDepositAddress}
                         size={180}
@@ -646,7 +635,7 @@ export default function OrderDetailsPage() {
               )}
 
               {/* Progress Steps - Vertical */}
-              <div className="bg-white/10 backdrop-blur-sm border border-gray-700/40 rounded-[30px] p-4">
+              <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
                 <h2 className="text-base font-semibold text-white mb-4">
                   Progress
                 </h2>
@@ -832,7 +821,7 @@ export default function OrderDetailsPage() {
               </div>
 
               {/* Order Info */}
-              <div className="bg-white/10 backdrop-blur-sm border border-gray-700/40 rounded-[30px] p-4">
+              <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
                 <h2 className="text-base font-semibold text-white mb-3">
                   Order Information
                 </h2>

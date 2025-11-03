@@ -112,7 +112,7 @@ export const AssetDropdown: React.FC<{
           {selectedAsset ? (
             <>
               <div className="relative flex items-center shrink-0">
-                {getAssetLogo(selectedAsset.asset.symbol, "lg")}
+                {getAssetLogo(selectedAsset.asset.symbol, "md")}
                 <div className="absolute -bottom-1 -right-1">
                   {getChainLogo(selectedAsset.chainName, "sm")}
                 </div>
