@@ -1,3 +1,4 @@
+import { DigestKey } from "@/utils/digestKey";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -32,11 +33,16 @@ interface WalletState {
   disconnectBTC: () => void;
   disconnectStarknet: () => void;
   disconnectAll: () => void;
+
+  digestKey: string | null;
+  setDigestKey: (key: string | null) => void;
+  getDigestKey: () => string;
+
 }
 
 export const useWalletStore = create<WalletState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       evmWallet: null,
       btcWallet: null,
       starknetWallet: null,
@@ -48,6 +54,20 @@ export const useWalletStore = create<WalletState>()(
       disconnectBTC: () => set({ btcWallet: null }),
       disconnectStarknet: () => set({ starknetWallet: null }),
       disconnectAll: () => set({ evmWallet: null, btcWallet: null, starknetWallet: null }),
+      digestKey: null,
+      setDigestKey: (key) =>
+        set(() => ({
+          digestKey: key,
+        })),
+      getDigestKey: () => {
+        const state = get();
+        if (state.digestKey) {
+          return state.digestKey;
+        }
+        const newKey = DigestKey.getDigestKey();
+        set({ digestKey: newKey });
+        return newKey;
+      },
     }),
     {
       name: "wallet-store",

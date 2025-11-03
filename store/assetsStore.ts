@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axios from "axios";
 import { API_URLS } from "../constants/constants";
+import { generateSecret } from "@/utils/secretManager";
 
 export type Asset = {
   symbol: string;
@@ -91,31 +92,6 @@ function buildBackendAssetValue(chainId: string, asset: Asset): string {
   return `${formattedChainId}:${assetKey}`;
 }
 
-async function generateCommitmentHash(orderData: {
-  sourceAsset: string;
-  sourceAmount: string;
-  destinationAsset: string;
-  destinationAmount: string;
-}): Promise<string> {
-  // Generate a unique commitment hash by including order data + timestamp + random bytes
-  const timestamp = Date.now();
-  const randomBytes = crypto.getRandomValues(new Uint8Array(16));
-  const randomHex = Array.from(randomBytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  const dataString = JSON.stringify({
-    ...orderData,
-    timestamp,
-    nonce: randomHex,
-  });
-
-  const encoder = new TextEncoder();
-  const data = encoder.encode(dataString);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
@@ -562,13 +538,8 @@ export const useAssetsStore = create<AssetsState>()(
           const sourceAsset = buildBackendAssetValue(fromAsset.chainId, fromAsset.asset);
           const destinationAsset = buildBackendAssetValue(toAsset.chainId, toAsset.asset);
 
-          // Generate commitment hash
-          const commitmentHash = await generateCommitmentHash({
-            sourceAsset,
-            sourceAmount: sourceAmountInSmallestUnits,
-            destinationAsset,
-            destinationAmount: destinationAmountInSmallestUnits,
-          });
+          const nonce = Date.now().toString();
+          const commitmentHash = await generateSecret(nonce);
 
           const orderPayload = {
             source: {
@@ -581,7 +552,7 @@ export const useAssetsStore = create<AssetsState>()(
               recipient: destinationRecipient,
               amount: destinationAmountInSmallestUnits,
             },
-            commitment_hash: commitmentHash,
+            commitment_hash: commitmentHash.secretHash,
           };
 
           const baseUrl = API_URLS.ORDERS.endsWith("/")
@@ -596,6 +567,13 @@ export const useAssetsStore = create<AssetsState>()(
             },
           });
 
+          if (response?.data?.order_id && commitmentHash?.secret) {
+            const orderId = response.data.order_id;
+            localStorage.setItem(
+              `order_secret_${orderId}`,
+              JSON.stringify({ secret: commitmentHash.secret })
+            );
+          }
           set({ isLoading: false });
           return response.data;
         } catch (error) {

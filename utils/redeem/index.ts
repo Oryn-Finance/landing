@@ -2,6 +2,7 @@ import { evmRedeem, EvmRedeemParams } from "./evmRedeem";
 import { bitcoinRedeem, BitcoinRedeemParams } from "./bitcoinRedeem";
 import { starknetRedeem, StarknetRedeemParams } from "./starknetRedeem";
 import { getChainIdFromAsset } from "../redeem";
+import { WalletClient } from "viem";
 
 export type RedeemType = "evm" | "bitcoin" | "starknet";
 
@@ -53,14 +54,8 @@ export interface UnifiedRedeemParams {
   swapId: string;
   secret: string;
   // EVM specific
+  wallet: WalletClient
   chainId?: number;
-  writeContract?: (config: {
-    address: `0x${string}`;
-    abi: readonly unknown[];
-    functionName: string;
-    args: unknown[];
-    chainId: number;
-  }) => void;
   // Bitcoin specific
   htlcAddress?: string;
   recipientAddress?: string;
@@ -75,33 +70,44 @@ export interface UnifiedRedeemResult {
 /**
  * Execute the appropriate redeem based on asset type
  */
-export const executeRedeem = (
+export const executeRedeem = async (
   params: UnifiedRedeemParams
-): void | Promise<UnifiedRedeemResult> => {
+): Promise<UnifiedRedeemResult> => {
   const redeemType = getRedeemTypeFromAsset(params.asset);
 
   switch (redeemType) {
     case "evm": {
-      if (!params.chainId || !params.writeContract) {
+      if (!params.wallet) {
         throw new Error(
-          "chainId and writeContract are required for EVM redeem"
+          "wallet is required for EVM redeem"
         );
       }
 
-      const chainId =
-        params.chainId || getChainIdFromAsset(params.asset) || undefined;
+      // Determine chain ID - prefer provided chainId, otherwise get from asset
+      const chainId = params.chainId || getChainIdFromAsset(params.asset);
       if (!chainId) {
         throw new Error(`Unable to determine chain ID for asset: ${params.asset}`);
       }
 
-      evmRedeem({
-        escrowAddress: params.escrowAddress,
-        swapId: params.swapId,
-        secret: params.secret,
-        chainId,
-        writeContract: params.writeContract!,
-      });
-      return; // EVM redeem is synchronous (triggers wagmi writeContract)
+      try {
+        const result = await evmRedeem({
+          escrowAddress: params.escrowAddress,
+          swapId: params.swapId,
+          secret: params.secret,
+          chainId,
+          wallet: params.wallet
+        });
+
+        return {
+          success: true,
+          txHash: result.txHash,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to redeem EVM swap",
+        };
+      }
     }
 
     case "bitcoin": {

@@ -1,4 +1,8 @@
-import { sha256, toBytes } from "viem";
+import { sha256 } from "viem";
+import { DigestKey } from "./digestKey";
+import { ECPairFactory } from 'ecpair';
+import * as ecc from 'tiny-secp256k1';
+
 
 // Helper functions
 export function with0x(str: string): `0x${string}` {
@@ -22,19 +26,41 @@ export type SecretData = {
     orderId: string;
 };
 
-// Generate secret from signature
-export async function generateSecret(
-    nonce: string,
-    signature: `0x${string}`
-): Promise<{ secret: `0x${string}`; secretHash: `0x${string}` }> {
-    // The secret is SHA256 of the signature
-    const secret = with0x(sha256(toBytes(signature)));
+export const generateSecret = async (nonce: string): Promise<{ secret: `0x${string}`; secretHash: `0x${string}` }> => {
+    const signature = await signMessage(nonce);
+    if (!signature) {
+        throw new Error('Failed to sign message');
+    }
 
-    // The secretHash is SHA256 of the secret
-    const secretHash = with0x(sha256(toBytes(secret)));
+    if (signature instanceof Error) {
+        throw signature;
+    }
 
+    const secret = sha256(with0x(signature));
+    const secretHash = sha256(secret);
     return { secret, secretHash };
 }
+
+const signMessage = async (nonce: string) => {
+    const digestKey = DigestKey.getDigestKey();
+    if (!digestKey) {
+        throw new Error('No digest key found');
+    }
+    const ECPair = ECPairFactory(ecc);
+
+    const signMessage = 'Avalanche Bridge' + nonce.toString();
+    const signMessageBuffer = Buffer.from(signMessage, 'utf8');
+    const hash = sha256(signMessageBuffer);
+
+    const digestKeyBuf = Buffer.from(trim0x(digestKey), 'hex');
+    if (digestKeyBuf.length !== 32) {
+        return new Error('Invalid private key length. Expected 32 bytes.');
+    }
+    const keyPair = ECPair.fromPrivateKey(digestKeyBuf);
+    const signature = keyPair.sign(Buffer.from(trim0x(hash), 'hex')).toString();
+    return signature as `0x${string}`;
+}
+
 
 // Prepare message for signing
 export function prepareSignMessage(nonce: string): string {

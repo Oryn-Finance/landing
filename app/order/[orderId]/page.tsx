@@ -9,12 +9,13 @@ import { Navbar } from "../../../components/Navbar";
 import { API_URLS } from "../../../constants/constants";
 import type { Order, OrderStatus } from "../../../types/order";
 import { ArrowLeft, Copy, CheckCircle2, Clock, Loader2, Play } from "lucide-react";
-import { useSignMessage, useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useSendTransaction } from "wagmi";
+import { useSignMessage, useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useSendTransaction, useWalletClient } from "wagmi";
 import { generateSecret, prepareSignMessage, storeSecret, getSecret, type SecretData } from "../../../utils/secretManager";
 import { with0x, trim0x, getChainIdFromAsset } from "../../../utils/redeem";
 import { executeRedeem, getRedeemTypeFromAsset } from "../../../utils/redeem/index";
-import { erc20Abi } from "viem";
+import { erc20Abi, type WalletClient } from "viem";
 import { ExternalLink } from "lucide-react";
+import { useAssetsStore } from "@/store/assetsStore";
 
 // Explorer URL mapping for different chains
 const EXPLORER_URLS: Record<string, (txHash: string) => string> = {
@@ -96,7 +97,9 @@ export default function OrderDetailsPage() {
 
   const { address, isConnected, chainId } = useAccount();
   const { signMessageAsync } = useSignMessage();
+  const { data: walletClient } = useWalletClient()
   const { switchChain } = useSwitchChain();
+  const { assets } = useAssetsStore();
 
   // Wagmi hook for writing contract
   const { writeContract, isPending: isWritingContract, data: writeContractData, error: writeContractError } = useWriteContract();
@@ -184,8 +187,22 @@ export default function OrderDetailsPage() {
 
     // Determine if we should continue polling based on order state
     const shouldPoll = (orderData: Order): boolean => {
+      // Stop polling if order is completed (check for claim_tx first)
+      if (orderData.destination_intent.transactions.claim_tx) {
+        return false;
+      }
+
       const sourceState = orderData.source_intent.state?.toLowerCase() || "";
       const destState = orderData.destination_intent.state?.toLowerCase() || "";
+
+      // Stop polling if states indicate completion
+      if (
+        sourceState === "completed" ||
+        destState === "completed" ||
+        destState === "claimed"
+      ) {
+        return false;
+      }
 
       // For awaiting_deposit and deposit_detected: poll until source_intent.transactions.create_tx has a tx hash
       // This applies when source state is "awaiting_deposit" or "deposit_detected", or when we don't have a create_tx yet
@@ -290,26 +307,10 @@ export default function OrderDetailsPage() {
     setRedeemError(null);
 
     try {
-      // Use commitment_hash as nonce (or order_id if commitment_hash is not suitable)
-      const nonce = order.source_intent.commitment_hash || orderId;
-      const message = prepareSignMessage(nonce);
-
-      // Sign message with wallet
-      const signature = (await signMessageAsync({ message })) as `0x${string}`;
-
-      // Generate secret from signature
-      const { secret, secretHash } = await generateSecret(nonce, signature);
-
-      // Store secret data
-      const secretDataToStore: SecretData = {
-        secret,
-        secretHash,
-        nonce,
-        orderId,
-      };
-
-      storeSecret(orderId, secretDataToStore);
-      setSecretData(secretDataToStore);
+      const stored = localStorage.getItem(`order_secret_${orderId}`);
+      if (stored) {
+        setSecretData(JSON.parse(stored));
+      }
     } catch (err) {
       console.error("Failed to generate secret:", err);
       setRedeemError(
@@ -355,27 +356,35 @@ export default function OrderDetailsPage() {
           return;
         }
 
-        // Switch chain if needed
-        if (chainId !== requiredChainId) {
-          try {
-            await switchChain({ chainId: requiredChainId });
-          } catch (switchError) {
-            setRedeemError("Failed to switch chain. Please switch manually.");
-            setIsRedeeming(false);
-            return;
-          }
-        }
+        // Log swap ID and secret before signing redeem transaction
+        console.log("Before signing redeem transaction request:");
+        console.log("Swap ID:", order.destination_intent.swap_id);
+        console.log("Secret:", secretData.secret);
 
-        // Execute EVM redeem
-        executeRedeem({
+        // Execute EVM redeem (network switching is handled inside executeRedeem)
+        const result = await executeRedeem({
           asset: destinationAsset,
           escrowAddress: order.destination_intent.escrow_address,
           swapId: order.destination_intent.swap_id,
           secret: secretData.secret,
           chainId: requiredChainId,
-          writeContract,
+          wallet: walletClient as unknown as WalletClient
         });
+
+        if (result && !result.success) {
+          setRedeemError(result.error || "Failed to redeem EVM swap");
+          setIsRedeeming(false);
+        } else if (result && result.success) {
+          // Success - refresh order after a delay
+          setTimeout(() => fetchOrder(), 2000);
+          setIsRedeeming(false);
+        }
       } else if (redeemType === "bitcoin") {
+        // Log swap ID and secret before signing redeem transaction
+        console.log("Before signing redeem transaction request:");
+        console.log("Swap ID:", order.destination_intent.swap_id);
+        console.log("Secret:", secretData.secret);
+
         // Execute Bitcoin redeem (async)
         const result = await executeRedeem({
           asset: destinationAsset,
@@ -384,6 +393,7 @@ export default function OrderDetailsPage() {
           secret: secretData.secret,
           htlcAddress: order.destination_intent.deposit_address,
           recipientAddress: order.destination_intent.recipient,
+          wallet: walletClient as unknown as WalletClient
         });
 
         if (result && !result.success) {
@@ -395,12 +405,18 @@ export default function OrderDetailsPage() {
           setIsRedeeming(false);
         }
       } else if (redeemType === "starknet") {
+        // Log swap ID and secret before signing redeem transaction
+        console.log("Before signing redeem transaction request:");
+        console.log("Swap ID:", order.destination_intent.swap_id);
+        console.log("Secret:", secretData.secret);
+
         // Execute Starknet redeem (async)
         const result = await executeRedeem({
           asset: destinationAsset,
           escrowAddress: order.destination_intent.escrow_address,
           swapId: order.destination_intent.swap_id,
           secret: secretData.secret,
+          wallet: walletClient as unknown as WalletClient
         });
 
         if (result && !result.success) {
@@ -619,18 +635,23 @@ export default function OrderDetailsPage() {
     // Check if order is completed
     if (
       orderToCheck.source_intent.state === "completed" ||
-      orderToCheck.destination_intent.state === "completed"
+      orderToCheck.destination_intent.state === "completed" ||
+      orderToCheck.destination_intent.transactions.claim_tx
     ) {
       return "complete";
     }
 
     // Check if deposit has been detected (source create_tx exists)
     if (orderToCheck.source_intent.transactions.create_tx) {
+      // If claim_tx exists, order is complete (double-check to be safe)
+      if (orderToCheck.destination_intent.transactions.claim_tx) {
+        return "complete";
+      }
+
       // If destination transaction exists, we're in redeeming state
       if (orderToCheck.destination_intent.transactions.create_tx) {
         return "redeeming";
       }
-
 
       if (writeContractData) {
         return "redeeming";
@@ -740,11 +761,11 @@ export default function OrderDetailsPage() {
                           {sourceInfo.chain}
                         </div>
                         <div className="text-sm font-medium text-gray-700 mt-2">
-                          {formatAmount(order.source_intent.amount, 8)}
+                          {formatAmount(order.source_intent.amount, assets.find(asset => asset.value === order.source_intent.asset)?.asset.decimals || 6)}
                         </div>
                       </>
-                    )}
-                  </div>
+                        )}
+                      </div>
 
                   {/* Arrow */}
                   <div className="mx-4">
@@ -763,7 +784,7 @@ export default function OrderDetailsPage() {
                           {destinationInfo.chain}
                         </div>
                         <div className="text-sm font-medium text-gray-700 mt-2">
-                          {formatAmount(order.destination_intent.amount, 8)}
+                          {formatAmount(order.destination_intent.amount, assets.find(asset => asset.value === order.destination_intent.asset)?.asset.decimals || 8)}
                         </div>
                       </>
                     )}
@@ -951,7 +972,7 @@ export default function OrderDetailsPage() {
                         <div className="flex items-start gap-4 pb-6">
                           {/* Status Icon */}
                           <div className="shrink-0 mt-0.5 relative z-10">
-                            {isCompleted ? (
+                            {isCompleted || (isCurrent && status === "complete") ? (
                               <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
                                 <CheckCircle2 className="w-5 h-5 text-white" />
                               </div>
@@ -969,16 +990,16 @@ export default function OrderDetailsPage() {
                           {/* Status Label */}
                           <div className="flex-1 pt-1">
                             <div
-                              className={`font-medium ${isCurrent
+                              className={`font-medium ${isCurrent && status !== "complete"
                                 ? "text-purple-600"
-                                : isCompleted
+                                : isCompleted || (isCurrent && status === "complete")
                                   ? "text-green-600"
                                   : "text-gray-400"
                                 }`}
                             >
                               {STATUS_LABELS[status]}
                             </div>
-                            {isCurrent && (
+                            {isCurrent && status !== "complete" && (
                               <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                                 {isPolling && (
                                   <Loader2 className="w-3 h-3 animate-spin" />

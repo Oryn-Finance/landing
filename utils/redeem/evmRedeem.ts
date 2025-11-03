@@ -1,42 +1,50 @@
+import { getContract, WalletClient } from "viem";
 import { evmHTLCABI } from "../../abi/evmHTLC";
-import { with0x, trim0x } from "../redeem";
+import { with0x } from "../redeem";
+import { chainIdToEvmChain, switchOrAddNetwork } from "../networkUtils";
 
 export interface EvmRedeemParams {
   escrowAddress: string;
   swapId: string;
   secret: string;
   chainId: number;
-  writeContract: (config: {
-    address: `0x${string}`;
-    abi: readonly unknown[];
-    functionName: string;
-    args: unknown[];
-    chainId: number;
-  }) => void;
+  wallet: WalletClient;
 }
 
 /**
  * Redeem an EVM HTLC swap by calling claimSwap
  */
-export const evmRedeem = (params: EvmRedeemParams): void => {
-  const { escrowAddress, swapId, secret, chainId, writeContract } = params;
+export const evmRedeem = async (params: EvmRedeemParams): Promise<{ success: boolean; txHash: string }> => {
+  const { escrowAddress, swapId, secret, wallet, chainId } = params;
 
   // Ensure addresses have 0x prefix
-  const contractAddress = with0x(trim0x(escrowAddress)) as `0x${string}`;
-  const swapIdBytes32 = with0x(trim0x(swapId)) as `0x${string}`;
+  const contractAddress = with0x(escrowAddress);
+  const swapIdBytes32 = with0x(swapId);
 
-  // Ensure secret is in bytes format (the ABI expects bytes, not bytes32)
-  // Remove 0x if present, then add it back for proper hex formatting
-  const secretBytes = secret.startsWith("0x") ? secret.slice(2) : secret;
-  const secretFormatted = `0x${secretBytes}` as `0x${string}`;
+  // Switch or add to the correct network
+  const switchResult = await switchOrAddNetwork(chainIdToEvmChain[chainId], wallet);
 
-  // Call claimSwap function
-  writeContract({
-    address: contractAddress,
+  if (switchResult.isErr()) {
+    throw new Error(`Network switch failed: ${switchResult.error}`);
+  }
+
+  const switchedWalletClient = switchResult.value.walletClient;
+
+  const contract = getContract({
     abi: evmHTLCABI,
-    functionName: "claimSwap",
-    args: [swapIdBytes32, secretFormatted],
-    chainId,
+    address: contractAddress,
+    client: switchedWalletClient,
   });
-};
+  
+  // Ensure secret is in bytes format (the ABI expects bytes, not bytes32)
+  const secretFormatted = secret.startsWith("0x") ? secret : `0x${secret}`;
 
+  const result = await contract.write.claimSwap([swapIdBytes32, secretFormatted], {
+    account: switchedWalletClient.account,
+  });
+
+  return {
+    success: true,
+    txHash: result,
+  };
+};
