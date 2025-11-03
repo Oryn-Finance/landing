@@ -163,7 +163,7 @@ export const AssetDropdown: React.FC<{
                   backgroundClip: "text",
                 }}
               >
-                Select asset
+              Select asset
               </span>
             </span>
           )}

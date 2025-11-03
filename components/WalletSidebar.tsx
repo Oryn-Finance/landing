@@ -17,11 +17,12 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
     const [modalOpen, setModalOpen] = useState(false);
     const [loadingEVM, setLoadingEVM] = useState(false);
     const [loadingBTC, setLoadingBTC] = useState(false);
+    const [loadingStarknet, setLoadingStarknet] = useState(false);
 
     const { address, isConnected, chainId } = useAccount();
     const { disconnect } = useDisconnect();
     const { connectors, connect } = useConnect();
-    const { evmWallet, btcWallet, setEVMWallet, setBTCWallet, disconnectEVM } = useWalletStore();
+    const { evmWallet, btcWallet, starknetWallet, setEVMWallet, setBTCWallet, setStarknetWallet, disconnectEVM } = useWalletStore();
 
     // Sync wagmi state with our store
     useEffect(() => {
@@ -101,10 +102,58 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
         }
     };
 
+    const handleStarknetConnect = async (wallet: any) => {
+        setLoadingStarknet(true);
+        try {
+            if (typeof window !== "undefined") {
+                if (wallet.id === "argent-x" && typeof (window as any).starknet !== "undefined") {
+                    const starknet = (window as any).starknet;
+                    if (starknet.isArgentX) {
+                        await starknet.enable();
+                        if (starknet.account && starknet.account.address) {
+                            setStarknetWallet({
+                                address: starknet.account.address,
+                                isConnected: true,
+                            });
+                            setModalOpen(false);
+                        }
+                    }
+                } else if (wallet.id === "braavos" && typeof (window as any).starknet !== "undefined") {
+                    const starknet = (window as any).starknet;
+                    if (starknet.isBraavos) {
+                        await starknet.enable();
+                        if (starknet.account && starknet.account.address) {
+                            setStarknetWallet({
+                                address: starknet.account.address,
+                                isConnected: true,
+                            });
+                            setModalOpen(false);
+                        }
+                    }
+                } else if (wallet.id === "starknet" && typeof (window as any).starknet !== "undefined") {
+                    const starknet = (window as any).starknet;
+                    await starknet.enable();
+                    if (starknet.account && starknet.account.address) {
+                        setStarknetWallet({
+                            address: starknet.account.address,
+                            isConnected: true,
+                        });
+                        setModalOpen(false);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Failed to connect Starknet wallet:", error);
+        } finally {
+            setLoadingStarknet(false);
+        }
+    };
+
     const handleCloseModal = () => {
         setModalOpen(false);
         setLoadingEVM(false);
         setLoadingBTC(false);
+        setLoadingStarknet(false);
     };
 
     // Lock body scroll when sidebar is open
@@ -151,6 +200,10 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
 
     const handleDisconnectBTC = () => {
         setBTCWallet({ address: "", isConnected: false });
+    };
+
+    const handleDisconnectStarknet = () => {
+        setStarknetWallet({ address: "", isConnected: false });
     };
 
     return (
@@ -263,10 +316,48 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
                                         </button>
                                     </motion.div>
                                 )}
+
+                                {/* Starknet Wallet */}
+                                {starknetWallet?.isConnected && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="p-4 rounded-lg border border-purple-200 bg-purple-50"
+                                    >
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <Image
+                                                    src="https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png"
+                                                    alt="starknet"
+                                                    width={32}
+                                                    height={32}
+                                                    className="rounded-full"
+                                                />
+                                                <div>
+                                                    <h3 className="font-semibold text-purple-900">Starknet Wallet</h3>
+                                                    <p className="text-xs text-purple-600">Starknet Network</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mb-3">
+                                            <p className="text-xs text-purple-600 mb-1">Address</p>
+                                            <p className="text-sm font-mono text-purple-900 break-all">
+                                                {starknetWallet.address}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleDisconnectStarknet}
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors cursor-pointer text-sm font-medium"
+                                        >
+                                            <LogOut className="w-4 h-4" />
+                                            Disconnect
+                                        </button>
+                                    </motion.div>
+                                )}
                             </div>
 
                             {/* No wallets connected */}
-                            {!isConnected && !evmWallet?.isConnected && !btcWallet?.isConnected && (
+                            {!isConnected && !evmWallet?.isConnected && !btcWallet?.isConnected && !starknetWallet?.isConnected && (
                                 <div className="text-center py-8 text-gray-500">
                                     <Wallet className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                                     <p>No wallets connected</p>
@@ -277,8 +368,8 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
                             )}
                         </div>
 
-                        {/* Add Wallet Button at Bottom - Only show if not both connected */}
-                        {!(isConnected && evmWallet?.isConnected && btcWallet?.isConnected) && (
+                        {/* Add Wallet Button at Bottom - Only show if not all connected */}
+                        {!(isConnected && evmWallet?.isConnected && btcWallet?.isConnected && starknetWallet?.isConnected) && (
                             <div className="border-t p-4 shrink-0">
                                 <motion.button
                                     onClick={() => setModalOpen(true)}
@@ -308,8 +399,10 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
                 onClose={handleCloseModal}
                 onEVMConnect={handleEVMConnect}
                 onBTCConnect={handleBTCConnect}
+                onStarknetConnect={handleStarknetConnect}
                 loadingEVM={loadingEVM}
                 loadingBTC={loadingBTC}
+                loadingStarknet={loadingStarknet}
             />
         </AnimatePresence>
     );

@@ -8,12 +8,17 @@ import QRCodeSVG from "react-qr-code";
 import { Navbar } from "../../../components/Navbar";
 import { API_URLS } from "../../../constants/constants";
 import type { Order, OrderStatus } from "../../../types/order";
-import { ArrowLeft, Copy, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, Copy, CheckCircle2, Clock, Loader2, Play } from "lucide-react";
+import { useSignMessage, useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
+import { generateSecret, prepareSignMessage, storeSecret, getSecret, type SecretData } from "../../../utils/secretManager";
+import { arbitrumSepolia, avalancheFuji } from "wagmi/chains";
+import { AtomicSwapABI, with0x, trim0x, getChainIdFromAsset } from "../../../utils/redeem";
 
 const STATUS_STEPS: OrderStatus[] = [
   "initiated",
   "awaiting_deposit",
   "deposit_detected",
+  "awaiting_redeem",
   "redeeming",
   "complete",
 ];
@@ -22,6 +27,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   initiated: "Initiated",
   awaiting_deposit: "Awaiting Deposit",
   deposit_detected: "Deposit Detected",
+  awaiting_redeem: "Awaiting Redeem",
   redeeming: "Redeeming",
   complete: "Complete",
 };
@@ -60,27 +66,122 @@ export default function OrderDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isOrderCompleteRef = useRef(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [isGeneratingSecret, setIsGeneratingSecret] = useState(false);
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [secretData, setSecretData] = useState<SecretData | null>(null);
+  const [redeemError, setRedeemError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const { address, isConnected, chainId } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const { switchChain } = useSwitchChain();
+
+  // Wagmi hook for writing contract
+  const { writeContract, isPending: isWritingContract, data: writeContractData, error: writeContractError } = useWriteContract();
+
+  // Wait for transaction receipt
+  const { data: receipt, isLoading: isWaitingForReceipt } = useWaitForTransactionReceipt({
+    hash: writeContractData,
+  });
+
+  const fetchOrder = async () => {
     if (!orderId) return;
 
-    const fetchOrder = async (isInitialLoad = false) => {
-      // Stop polling if order is already complete
-      if (isOrderCompleteRef.current) {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-        return;
+    try {
+      const baseUrl = API_URLS.ORDERS.endsWith("/")
+        ? API_URLS.ORDERS.slice(0, -1)
+        : API_URLS.ORDERS;
+      const url = `${baseUrl}/orders/${orderId}`;
+
+      const response = await axios.get<
+        { status: string; result: Order } | { data: Order } | Order
+      >(url, {
+        timeout: 10000,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Handle different possible response formats
+      let orderData: Order | null = null;
+
+      // Format 1: { status: "Ok", result: Order }
+      if (
+        "status" in response.data &&
+        "result" in response.data &&
+        response.data.status === "Ok"
+      ) {
+        orderData = response.data.result;
+      }
+      // Format 2: { data: Order }
+      else if ("data" in response.data && "order_id" in response.data.data) {
+        orderData = response.data.data;
+      }
+      // Format 3: Direct Order object
+      else if ("order_id" in response.data) {
+        orderData = response.data as Order;
       }
 
-      if (isInitialLoad) {
-        setIsLoading(true);
-        setError(null);
+      if (orderData) {
+        setOrder(orderData);
+      } else {
+        setError("Order not found or invalid response format");
+      }
+    } catch (err) {
+      console.error("Failed to fetch order:", err);
+      setError("Failed to load order details");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchOrder();
+  }, [orderId]);
+
+  // Polling logic
+  useEffect(() => {
+    if (!order || !orderId) return;
+
+    // Determine if we should continue polling based on order state
+    const shouldPoll = (orderData: Order): boolean => {
+      const sourceState = orderData.source_intent.state?.toLowerCase() || "";
+      const destState = orderData.destination_intent.state?.toLowerCase() || "";
+
+      // For awaiting_deposit and deposit_detected: poll until source_intent.transactions.create_tx has a tx hash
+      // This applies when source state is "awaiting_deposit" or "deposit_detected", or when we don't have a create_tx yet
+      if (
+        sourceState === "awaiting_deposit" ||
+        sourceState === "deposit_detected" ||
+        (!sourceState && orderData.source_intent.deposit_address && !orderData.source_intent.transactions.create_tx)
+      ) {
+        return !orderData.source_intent.transactions.create_tx;
       }
 
+      // For awaiting_redeem: poll until destination_intent.transactions.create_tx has a tx hash
+      // This applies when destination state indicates we're awaiting redeem, or source has create_tx but destination doesn't
+      if (
+        destState === "awaiting_redeem" ||
+        destState === "redeeming" ||
+        (orderData.source_intent.transactions.create_tx && !orderData.destination_intent.transactions.create_tx)
+      ) {
+        return !orderData.destination_intent.transactions.create_tx;
+      }
+
+      // Stop polling for completed or other states
+      return false;
+    };
+
+    if (!shouldPoll(order)) {
+      setIsPolling(false);
+      return;
+    }
+
+    setIsPolling(true);
+
+    // Poll every 3 seconds
+    const pollInterval = setInterval(async () => {
       try {
         const baseUrl = API_URLS.ORDERS.endsWith("/")
           ? API_URLS.ORDERS.slice(0, -1)
@@ -96,77 +197,217 @@ export default function OrderDetailsPage() {
           },
         });
 
-        // Handle different possible response formats
         let orderData: Order | null = null;
 
-        // Format 1: { status: "Ok", result: Order }
         if (
           "status" in response.data &&
           "result" in response.data &&
           response.data.status === "Ok"
         ) {
           orderData = response.data.result;
-        }
-        // Format 2: { data: Order }
-        else if ("data" in response.data && "order_id" in response.data.data) {
+        } else if ("data" in response.data && "order_id" in response.data.data) {
           orderData = response.data.data;
-        }
-        // Format 3: Direct Order object
-        else if ("order_id" in response.data) {
+        } else if ("order_id" in response.data) {
           orderData = response.data as Order;
         }
 
         if (orderData) {
           setOrder(orderData);
-          setError(null);
 
-          // Check if order is complete and stop polling
-          if (
-            orderData.source_intent.state === "completed" ||
-            orderData.destination_intent.state === "completed"
-          ) {
-            isOrderCompleteRef.current = true;
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
-            }
-          }
-        } else {
-          if (isInitialLoad) {
-            setError("Order not found or invalid response format");
+          // Check if we should stop polling
+          if (!shouldPoll(orderData)) {
+            clearInterval(pollInterval);
+            setIsPolling(false);
           }
         }
       } catch (err) {
-        console.error("Failed to fetch order:", err);
-        if (isInitialLoad) {
-          setError("Failed to load order details");
-        }
-      } finally {
-        if (isInitialLoad) {
-          setIsLoading(false);
-        }
+        console.error("Failed to poll order:", err);
+        // Continue polling on error
       }
-    };
+    }, 3000); // Poll every 3 seconds
 
-    // Reset completion flag when orderId changes
-    isOrderCompleteRef.current = false;
-
-    // Initial fetch
-    fetchOrder(true);
-
-    // Set up polling every 2 seconds
-    pollIntervalRef.current = setInterval(() => {
-      fetchOrder(false);
-    }, 2000);
-
-    // Cleanup interval on unmount or when orderId changes
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
+      clearInterval(pollInterval);
+      setIsPolling(false);
     };
+  }, [order, orderId]);
+
+  // Load secret from localStorage on mount
+  useEffect(() => {
+    if (orderId) {
+      const stored = getSecret(orderId);
+      if (stored) {
+        setSecretData(stored);
+      }
+    }
   }, [orderId]);
+
+  const handleGenerateSecret = async () => {
+    if (!order || !isConnected || !address) {
+      setRedeemError("Please connect your wallet first");
+      return;
+    }
+
+    setIsGeneratingSecret(true);
+    setRedeemError(null);
+
+    try {
+      // Use commitment_hash as nonce (or order_id if commitment_hash is not suitable)
+      const nonce = order.source_intent.commitment_hash || orderId;
+      const message = prepareSignMessage(nonce);
+
+      // Sign message with wallet
+      const signature = (await signMessageAsync({ message })) as `0x${string}`;
+
+      // Generate secret from signature
+      const { secret, secretHash } = await generateSecret(nonce, signature);
+
+      // Store secret data
+      const secretDataToStore: SecretData = {
+        secret,
+        secretHash,
+        nonce,
+        orderId,
+      };
+
+      storeSecret(orderId, secretDataToStore);
+      setSecretData(secretDataToStore);
+    } catch (err) {
+      console.error("Failed to generate secret:", err);
+      setRedeemError(
+        err instanceof Error ? err.message : "Failed to generate secret"
+      );
+    } finally {
+      setIsGeneratingSecret(false);
+    }
+  };
+
+  // Handle redeem transaction using wagmi hooks
+  const handleRedeem = async () => {
+    if (!order || !secretData) {
+      setRedeemError("Please generate secret first");
+      return;
+    }
+
+    if (!isConnected) {
+      setRedeemError("Please connect your wallet first");
+      return;
+    }
+
+    setIsRedeeming(true);
+    setRedeemError(null);
+
+    try {
+      const destinationAsset = order.destination_intent.asset;
+      const requiredChainId = getChainIdFromAsset(destinationAsset);
+
+      if (!requiredChainId) {
+        setRedeemError(`Unsupported chain for asset: ${destinationAsset}`);
+        setIsRedeeming(false);
+        return;
+      }
+
+      // Switch chain if needed
+      if (chainId !== requiredChainId) {
+        try {
+          await switchChain({ chainId: requiredChainId });
+        } catch (switchError) {
+          setRedeemError("Failed to switch chain. Please switch manually.");
+          setIsRedeeming(false);
+          return;
+        }
+      }
+
+      // Prepare contract call parameters
+      const contractAddress = with0x(trim0x(order.destination_intent.escrow_address));
+      const swapId = with0x(trim0x(order.destination_intent.swap_id));
+
+      // Ensure secret is 32 bytes (0x + 64 hex chars)
+      const secretBytes = secretData.secret.startsWith("0x") ? secretData.secret.slice(2) : secretData.secret;
+      const secret32 = `0x${secretBytes.slice(0, 64).padStart(64, "0")}` as `0x${string}`;
+
+      // Write contract - this will trigger MetaMask popup
+      writeContract({
+        address: contractAddress,
+        abi: AtomicSwapABI,
+        functionName: "redeem",
+        args: [swapId, secret32],
+        chainId: requiredChainId,
+      });
+    } catch (err) {
+      console.error("Failed to initiate redeem:", err);
+      setRedeemError(
+        err instanceof Error ? err.message : "Failed to initiate redeem"
+      );
+      setIsRedeeming(false);
+    }
+  };
+
+  // Handle transaction receipt
+  useEffect(() => {
+    if (receipt && receipt.status === "success") {
+      // Transaction successful, refresh order
+      fetchOrder();
+      setIsRedeeming(false);
+      // Poll will automatically pick up the new transaction
+    } else if (receipt && receipt.status === "reverted") {
+      setRedeemError("Transaction reverted. Please try again.");
+      setIsRedeeming(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipt]);
+
+  // Handle write contract errors
+  useEffect(() => {
+    if (writeContractError) {
+      setRedeemError(writeContractError.message || "Failed to send transaction");
+      setIsRedeeming(false);
+    }
+  }, [writeContractError]);
+
+  // Update isRedeeming based on wagmi states
+  useEffect(() => {
+    setIsRedeeming(isWritingContract || isWaitingForReceipt);
+  }, [isWritingContract, isWaitingForReceipt]);
+
+  // Auto-generate secret when deposit is detected
+  useEffect(() => {
+    if (
+      order &&
+      order.source_intent.transactions.create_tx && // Deposit detected
+      !secretData && // Secret not generated yet
+      !isGeneratingSecret && // Not currently generating
+      isConnected && // Wallet connected
+      address // Has address
+    ) {
+      handleGenerateSecret();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.source_intent.transactions.create_tx, secretData, isConnected, address]);
+
+  // Auto-call redeem when deposit is detected and secret is generated
+  useEffect(() => {
+    if (
+      order &&
+      order.source_intent.transactions.create_tx && // Deposit detected
+      !order.destination_intent.transactions.create_tx && // Redeem not called yet
+      secretData && // Secret generated
+      !isRedeeming && // Not currently redeeming
+      !writeContractData && // No pending transaction
+      isConnected && // Wallet connected
+      chainId !== undefined // Chain ID available
+    ) {
+      // Auto-trigger redeem
+      handleRedeem();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    order?.source_intent.transactions.create_tx,
+    order?.destination_intent.transactions.create_tx,
+    secretData,
+    isConnected,
+    chainId,
+  ]);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -178,35 +419,51 @@ export default function OrderDetailsPage() {
     }
   };
 
-  const getCurrentStatus = (): OrderStatus => {
-    if (!order) return "initiated";
+  const getCurrentStatus = (orderData?: Order | null): OrderStatus => {
+    const orderToCheck = orderData || order;
+    if (!orderToCheck) return "initiated";
 
     // Determine status based on order state
-    // This is a simplified version - you may need to adjust based on actual API response
+    // Check if order is completed
     if (
-      order.source_intent.state === "completed" ||
-      order.destination_intent.state === "completed"
+      orderToCheck.source_intent.state === "completed" ||
+      orderToCheck.destination_intent.state === "completed"
     ) {
       return "complete";
     }
-    if (
-      order.source_intent.state === "redeeming" ||
-      order.destination_intent.state === "redeeming"
-    ) {
-      return "redeeming";
-    }
-    if (
-      order.source_intent.transactions.create_tx ||
-      order.destination_intent.transactions.create_tx
-    ) {
+
+    // Check if deposit has been detected (source create_tx exists)
+    if (orderToCheck.source_intent.transactions.create_tx) {
+      // If destination transaction exists, we're in redeeming state
+      if (orderToCheck.destination_intent.transactions.create_tx) {
+        return "redeeming";
+      }
+
+      // If we have a transaction hash (user approved transaction in MetaMask)
+      // writeContractData only exists AFTER user approves the transaction
+      // Only advance to redeeming if we have the hash (user approved)
+      if (writeContractData) {
+        return "redeeming";
+      }
+
+      // Deposit detected but no destination transaction yet
+      // If secret is generated but no transaction hash exists yet
+      // we're awaiting redeem approval - user needs to approve the MetaMask popup
+      // writeContractData only exists AFTER user approves, so if it doesn't exist, we're still awaiting
+      if (secretData && !writeContractData) {
+        // User hasn't approved yet, still in awaiting_redeem (clock icon)
+        return "awaiting_redeem";
+      }
+
+      // Deposit detected, but secret not generated yet
       return "deposit_detected";
     }
-    if (
-      order.source_intent.deposit_address ||
-      order.destination_intent.deposit_address
-    ) {
+
+    // Check if deposit address exists (awaiting deposit)
+    if (orderToCheck.source_intent.deposit_address) {
       return "awaiting_deposit";
     }
+
     return "initiated";
   };
 
@@ -401,18 +658,20 @@ export default function OrderDetailsPage() {
                           {/* Status Label */}
                           <div className="flex-1 pt-1">
                             <div
-                              className={`font-medium ${
-                                isCurrent
-                                  ? "text-purple-600"
-                                  : isCompleted
+                              className={`font-medium ${isCurrent
+                                ? "text-purple-600"
+                                : isCompleted
                                   ? "text-green-600"
                                   : "text-gray-400"
-                              }`}
+                                }`}
                             >
                               {STATUS_LABELS[status]}
                             </div>
                             {isCurrent && (
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                                {isPolling && (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                )}
                                 In progress...
                               </div>
                             )}
@@ -422,9 +681,8 @@ export default function OrderDetailsPage() {
                         {/* Connector Line */}
                         {index < STATUS_STEPS.length - 1 && (
                           <div
-                            className={`absolute left-4 w-0.5 ${
-                              isCompleted ? "bg-green-500" : "bg-gray-200"
-                            }`}
+                            className={`absolute left-4 w-0.5 ${isCompleted ? "bg-green-500" : "bg-gray-200"
+                              }`}
                             style={{ top: "2rem", height: "2.5rem" }}
                           />
                         )}
@@ -460,6 +718,7 @@ export default function OrderDetailsPage() {
                   </div>
                 </div>
               </div>
+
             </motion.div>
           )}
         </div>

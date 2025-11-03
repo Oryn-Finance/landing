@@ -34,7 +34,7 @@ const Swap: React.FC<SwapProps> = () => {
     createOrder,
   } = useAssetsStore();
 
-  const { evmWallet, btcWallet } = useWalletStore();
+  const { evmWallet, btcWallet, starknetWallet } = useWalletStore();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<"from" | "to" | null>(
     null
@@ -62,12 +62,21 @@ const Swap: React.FC<SwapProps> = () => {
     return identifier.includes("bitcoin") || identifier.includes("btc");
   };
 
+  // Helper function to determine if a chain is Starknet-based
+  const isStarknetChain = (chainId: string, chainName: string): boolean => {
+    const identifier = `${chainId}${chainName}`.toLowerCase();
+    return identifier.includes("starknet") || identifier.includes("stark");
+  };
+
   // Get wallet address for a given chain
   const getWalletAddress = (asset: typeof fromAsset): string | null => {
     if (!asset) return null;
     const isBTC = isBitcoinChain(asset.chainId, asset.chainName);
+    const isStark = isStarknetChain(asset.chainId, asset.chainName);
     if (isBTC) {
       return btcWallet?.isConnected ? btcWallet.address : null;
+    } else if (isStark) {
+      return starknetWallet?.isConnected ? starknetWallet.address : null;
     } else {
       return evmWallet?.isConnected ? evmWallet.address : null;
     }
@@ -82,12 +91,18 @@ const Swap: React.FC<SwapProps> = () => {
     const sourceAddress = getWalletAddress(fromAsset);
     const destinationAddress = getWalletAddress(toAsset);
 
+    const getWalletType = (asset: typeof fromAsset): string => {
+      if (!asset) return "wallet";
+      if (isBitcoinChain(asset.chainId, asset.chainName)) return "Bitcoin";
+      if (isStarknetChain(asset.chainId, asset.chainName)) return "Starknet";
+      return "EVM";
+    };
+
     if (!sourceAddress) {
       setOrderError(
-        `Please connect your ${
-          isBitcoinChain(fromAsset.chainId, fromAsset.chainName)
-            ? "Bitcoin"
-            : "EVM"
+        `Please connect your ${isBitcoinChain(fromAsset.chainId, fromAsset.chainName)
+          ? "Bitcoin"
+          : "EVM"
         } wallet for the source chain`
       );
       return;
@@ -95,8 +110,7 @@ const Swap: React.FC<SwapProps> = () => {
 
     if (!destinationAddress) {
       setOrderError(
-        `Please connect your ${
-          isBitcoinChain(toAsset.chainId, toAsset.chainName) ? "Bitcoin" : "EVM"
+        `Please connect your ${isBitcoinChain(toAsset.chainId, toAsset.chainName) ? "Bitcoin" : "EVM"
         } wallet for the destination chain`
       );
       return;
@@ -109,10 +123,32 @@ const Swap: React.FC<SwapProps> = () => {
       console.log("Order created successfully:", result);
 
       // Extract order_id from result and navigate to order page
-      if (result?.order_id) {
-        router.push(`/order/${result.order_id}`);
+      // Handle different possible response formats
+      let orderId: string | null = null;
+
+      if (typeof result === "object" && result !== null) {
+        const resultObj = result as Record<string, unknown>;
+        // Check various possible response formats
+        if (typeof resultObj.order_id === "string") {
+          orderId = resultObj.order_id;
+        } else if (resultObj.data && typeof resultObj.data === "object" && resultObj.data !== null) {
+          const data = resultObj.data as Record<string, unknown>;
+          if (typeof data.order_id === "string") {
+            orderId = data.order_id;
+          }
+        } else if (resultObj.result && typeof resultObj.result === "object" && resultObj.result !== null) {
+          const resultData = resultObj.result as Record<string, unknown>;
+          if (typeof resultData.order_id === "string") {
+            orderId = resultData.order_id;
+          }
+        }
+      }
+
+      if (orderId) {
+        router.push(`/order/${orderId}`);
       } else {
-        setOrderError("Order created but invalid response format");
+        console.error("Order ID not found in response:", result);
+        setOrderError("Order created but could not redirect. Please check your orders.");
       }
     } catch (error) {
       console.error("Failed to create order:", error);
@@ -239,7 +275,7 @@ const Swap: React.FC<SwapProps> = () => {
                 !quote || !sendValue || parseFloat(sendValue) <= 0
                   ? "border-b-0"
                   : "border-b"
-              } border-gray-100 p-4 md:p-6`}
+                } border-gray-100 p-4 md:p-6`}
             >
               <label className="block text-xl md:text-2xl font-medium text-gray-700 mb-3">
                 You Receive
@@ -263,8 +299,8 @@ const Swap: React.FC<SwapProps> = () => {
                     value={
                       receiveAmount
                         ? Number(receiveAmount)
-                            .toFixed(6)
-                            .replace(/\.?0+$/, "") || "0"
+                          .toFixed(6)
+                          .replace(/\.?0+$/, "") || "0"
                         : ""
                     }
                     readOnly
@@ -412,10 +448,10 @@ const Swap: React.FC<SwapProps> = () => {
           isLoading
             ? "Loading Assets..."
             : isQuoteLoading
-            ? "Getting Quote..."
-            : isCreatingOrder
-            ? "Creating Order..."
-            : "Processing..."
+              ? "Getting Quote..."
+              : isCreatingOrder
+                ? "Creating Order..."
+                : "Processing..."
         }
         confirmText="Confirm Swap"
         onConfirm={handleConfirm}

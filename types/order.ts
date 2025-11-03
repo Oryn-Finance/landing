@@ -32,5 +32,6 @@ export type OrderStatus =
   | "initiated"
   | "awaiting_deposit"
   | "deposit_detected"
+  | "awaiting_redeem"
   | "redeeming"
   | "complete";
