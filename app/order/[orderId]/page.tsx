@@ -9,10 +9,29 @@ import { Navbar } from "../../../components/Navbar";
 import { API_URLS } from "../../../constants/constants";
 import type { Order, OrderStatus } from "../../../types/order";
 import { ArrowLeft, Copy, CheckCircle2, Clock, Loader2, Play } from "lucide-react";
-import { useSignMessage, useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
+import { useSignMessage, useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useSendTransaction } from "wagmi";
 import { generateSecret, prepareSignMessage, storeSecret, getSecret, type SecretData } from "../../../utils/secretManager";
-import { arbitrumSepolia, avalancheFuji } from "wagmi/chains";
-import { AtomicSwapABI, with0x, trim0x, getChainIdFromAsset } from "../../../utils/redeem";
+import { with0x, trim0x, getChainIdFromAsset } from "../../../utils/redeem";
+import { executeRedeem, getRedeemTypeFromAsset } from "../../../utils/redeem/index";
+import { erc20Abi } from "viem";
+import { ExternalLink } from "lucide-react";
+
+// Explorer URL mapping for different chains
+const EXPLORER_URLS: Record<string, (txHash: string) => string> = {
+  arbitrum_sepolia: (txHash: string) => `https://sepolia.arbiscan.io/tx/${txHash}`,
+  avalanche_testnet: (txHash: string) => `https://testnet.snowtrace.io/tx/${txHash}`,
+  ethereum_sepolia: (txHash: string) => `https://sepolia.etherscan.io/tx/${txHash}`,
+  base_sepolia: (txHash: string) => `https://sepolia.basescan.org/tx/${txHash}`,
+};
+
+function getExplorerUrl(asset: string, txHash: string): string | null {
+  const chainName = asset.split(":")[0];
+  const explorerFn = EXPLORER_URLS[chainName];
+  if (explorerFn) {
+    return explorerFn(txHash);
+  }
+  return null;
+}
 
 const STATUS_STEPS: OrderStatus[] = [
   "initiated",
@@ -71,6 +90,9 @@ export default function OrderDetailsPage() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [secretData, setSecretData] = useState<SecretData | null>(null);
   const [redeemError, setRedeemError] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const { address, isConnected, chainId } = useAccount();
   const { signMessageAsync } = useSignMessage();
@@ -79,9 +101,25 @@ export default function OrderDetailsPage() {
   // Wagmi hook for writing contract
   const { writeContract, isPending: isWritingContract, data: writeContractData, error: writeContractError } = useWriteContract();
 
+  // Wagmi hook for payment transaction (ERC20)
+  const { writeContract: writePaymentContract, isPending: isWritingPayment, data: paymentTxHash, error: paymentTxError } = useWriteContract();
+
+  // Wagmi hook for native token payment
+  const { sendTransaction: sendNativeTransaction, isPending: isSendingNative, data: nativeTxHash, error: nativeTxError } = useSendTransaction();
+
   // Wait for transaction receipt
   const { data: receipt, isLoading: isWaitingForReceipt } = useWaitForTransactionReceipt({
     hash: writeContractData,
+  });
+
+  // Wait for payment transaction receipt (ERC20)
+  const { data: paymentReceipt, isLoading: isWaitingForPaymentReceipt } = useWaitForTransactionReceipt({
+    hash: paymentTxHash,
+  });
+
+  // Wait for native payment transaction receipt
+  const { data: nativePaymentReceipt, isLoading: isWaitingForNativeReceipt } = useWaitForTransactionReceipt({
+    hash: nativeTxHash,
   });
 
   const fetchOrder = async () => {
@@ -294,46 +332,89 @@ export default function OrderDetailsPage() {
       return;
     }
 
+    // Check if both intents are created
+    if (!order.source_intent.transactions.create_tx || !order.destination_intent.transactions.create_tx) {
+      setRedeemError("Both intents must be created before redeeming");
+      return;
+    }
+
     setIsRedeeming(true);
     setRedeemError(null);
 
     try {
       const destinationAsset = order.destination_intent.asset;
-      const requiredChainId = getChainIdFromAsset(destinationAsset);
+      const redeemType = getRedeemTypeFromAsset(destinationAsset);
 
-      if (!requiredChainId) {
-        setRedeemError(`Unsupported chain for asset: ${destinationAsset}`);
-        setIsRedeeming(false);
-        return;
-      }
+      // Handle EVM redeems
+      if (redeemType === "evm") {
+        const requiredChainId = getChainIdFromAsset(destinationAsset);
 
-      // Switch chain if needed
-      if (chainId !== requiredChainId) {
-        try {
-          await switchChain({ chainId: requiredChainId });
-        } catch (switchError) {
-          setRedeemError("Failed to switch chain. Please switch manually.");
+        if (!requiredChainId) {
+          setRedeemError(`Unsupported chain for asset: ${destinationAsset}`);
           setIsRedeeming(false);
           return;
         }
+
+        // Switch chain if needed
+        if (chainId !== requiredChainId) {
+          try {
+            await switchChain({ chainId: requiredChainId });
+          } catch (switchError) {
+            setRedeemError("Failed to switch chain. Please switch manually.");
+            setIsRedeeming(false);
+            return;
+          }
+        }
+
+        // Execute EVM redeem
+        executeRedeem({
+          asset: destinationAsset,
+          escrowAddress: order.destination_intent.escrow_address,
+          swapId: order.destination_intent.swap_id,
+          secret: secretData.secret,
+          chainId: requiredChainId,
+          writeContract,
+        });
+      } else if (redeemType === "bitcoin") {
+        // Execute Bitcoin redeem (async)
+        const result = await executeRedeem({
+          asset: destinationAsset,
+          escrowAddress: order.destination_intent.escrow_address,
+          swapId: order.destination_intent.swap_id,
+          secret: secretData.secret,
+          htlcAddress: order.destination_intent.deposit_address,
+          recipientAddress: order.destination_intent.recipient,
+        });
+
+        if (result && !result.success) {
+          setRedeemError(result.error || "Failed to redeem Bitcoin swap");
+          setIsRedeeming(false);
+        } else if (result && result.success) {
+          // Success - refresh order after a delay
+          setTimeout(() => fetchOrder(), 2000);
+          setIsRedeeming(false);
+        }
+      } else if (redeemType === "starknet") {
+        // Execute Starknet redeem (async)
+        const result = await executeRedeem({
+          asset: destinationAsset,
+          escrowAddress: order.destination_intent.escrow_address,
+          swapId: order.destination_intent.swap_id,
+          secret: secretData.secret,
+        });
+
+        if (result && !result.success) {
+          setRedeemError(result.error || "Failed to redeem Starknet swap");
+          setIsRedeeming(false);
+        } else if (result && result.success) {
+          // Success - refresh order after a delay
+          setTimeout(() => fetchOrder(), 2000);
+          setIsRedeeming(false);
+        }
+      } else {
+        setRedeemError(`Unsupported redeem type for asset: ${destinationAsset}`);
+        setIsRedeeming(false);
       }
-
-      // Prepare contract call parameters
-      const contractAddress = with0x(trim0x(order.destination_intent.escrow_address));
-      const swapId = with0x(trim0x(order.destination_intent.swap_id));
-
-      // Ensure secret is 32 bytes (0x + 64 hex chars)
-      const secretBytes = secretData.secret.startsWith("0x") ? secretData.secret.slice(2) : secretData.secret;
-      const secret32 = `0x${secretBytes.slice(0, 64).padStart(64, "0")}` as `0x${string}`;
-
-      // Write contract - this will trigger MetaMask popup
-      writeContract({
-        address: contractAddress,
-        abi: AtomicSwapABI,
-        functionName: "redeem",
-        args: [swapId, secret32],
-        chainId: requiredChainId,
-      });
     } catch (err) {
       console.error("Failed to initiate redeem:", err);
       setRedeemError(
@@ -385,29 +466,140 @@ export default function OrderDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.source_intent.transactions.create_tx, secretData, isConnected, address]);
 
-  // Auto-call redeem when deposit is detected and secret is generated
+  // Auto-call redeem when both intents are created and secret is generated
   useEffect(() => {
     if (
       order &&
-      order.source_intent.transactions.create_tx && // Deposit detected
-      !order.destination_intent.transactions.create_tx && // Redeem not called yet
+      order.source_intent.transactions.create_tx && // Source intent created
+      order.destination_intent.transactions.create_tx && // Destination intent created (BOTH must exist)
+      !order.destination_intent.transactions.claim_tx && // Claim not completed yet
       secretData && // Secret generated
       !isRedeeming && // Not currently redeeming
       !writeContractData && // No pending transaction
-      isConnected && // Wallet connected
-      chainId !== undefined // Chain ID available
+      isConnected // Wallet connected
     ) {
-      // Auto-trigger redeem
+      // Auto-trigger redeem when both intents are created
       handleRedeem();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     order?.source_intent.transactions.create_tx,
     order?.destination_intent.transactions.create_tx,
+    order?.destination_intent.transactions.claim_tx,
     secretData,
     isConnected,
     chainId,
   ]);
+
+  // Handle payment transaction
+  const handlePayment = async () => {
+    if (!order || !isConnected || !address) {
+      setPaymentError("Please connect your wallet first");
+      return;
+    }
+
+    const tokenAddress = order.source_intent.token_address;
+    const depositAddress = order.source_intent.deposit_address;
+    const amount = order.source_intent.amount;
+    const sourceAsset = order.source_intent.asset;
+    const requiredChainId = getChainIdFromAsset(sourceAsset);
+
+    if (!requiredChainId) {
+      setPaymentError(`Unsupported chain for asset: ${sourceAsset}`);
+      return;
+    }
+
+    // Switch chain if needed
+    if (chainId !== requiredChainId) {
+      try {
+        await switchChain({ chainId: requiredChainId });
+      } catch (switchError) {
+        setPaymentError("Failed to switch chain. Please switch manually.");
+        return;
+      }
+    }
+
+    setIsPaying(true);
+    setPaymentError(null);
+
+    try {
+      // Check if native token (ETH, AVAX, etc.)
+      if (!tokenAddress || tokenAddress === "native" || tokenAddress === "") {
+        // Send native token
+        sendNativeTransaction({
+          to: with0x(trim0x(depositAddress)),
+          value: BigInt(amount),
+          chainId: requiredChainId,
+        });
+      } else {
+        // Send ERC20 token
+        writePaymentContract({
+          address: with0x(trim0x(tokenAddress)),
+          abi: erc20Abi,
+          functionName: "transfer",
+          args: [with0x(trim0x(depositAddress)), BigInt(amount)],
+          chainId: requiredChainId,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to send payment:", err);
+      setPaymentError(
+        err instanceof Error ? err.message : "Failed to send payment"
+      );
+      setIsPaying(false);
+    }
+  };
+
+  // Handle payment transaction receipt (ERC20)
+  useEffect(() => {
+    if (paymentReceipt && paymentReceipt.status === "success") {
+      setIsPaying(false);
+      setShowPaymentModal(false);
+      // Refresh order after payment
+      setTimeout(() => fetchOrder(), 2000);
+    } else if (paymentReceipt && paymentReceipt.status === "reverted") {
+      setPaymentError("Transaction reverted. Please try again.");
+      setIsPaying(false);
+    }
+  }, [paymentReceipt]);
+
+  // Handle native payment transaction receipt
+  useEffect(() => {
+    if (nativePaymentReceipt && nativePaymentReceipt.status === "success") {
+      setIsPaying(false);
+      setShowPaymentModal(false);
+      // Refresh order after payment
+      setTimeout(() => fetchOrder(), 2000);
+    } else if (nativePaymentReceipt && nativePaymentReceipt.status === "reverted") {
+      setPaymentError("Transaction reverted. Please try again.");
+      setIsPaying(false);
+    }
+  }, [nativePaymentReceipt]);
+
+  // Handle payment transaction errors
+  useEffect(() => {
+    if (paymentTxError) {
+      setPaymentError(paymentTxError.message || "Failed to send transaction");
+      setIsPaying(false);
+    }
+    if (nativeTxError) {
+      setPaymentError(nativeTxError.message || "Failed to send transaction");
+      setIsPaying(false);
+    }
+  }, [paymentTxError, nativeTxError]);
+
+  // Update isPaying based on wagmi states
+  useEffect(() => {
+    setIsPaying(isWritingPayment || isSendingNative || isWaitingForPaymentReceipt || isWaitingForNativeReceipt);
+  }, [isWritingPayment, isSendingNative, isWaitingForPaymentReceipt, isWaitingForNativeReceipt]);
+
+  // Close payment modal when transaction hash is received
+  useEffect(() => {
+    const txHash = paymentTxHash || nativeTxHash;
+    if (txHash && showPaymentModal) {
+      setShowPaymentModal(false);
+    }
+  }, [paymentTxHash, nativeTxHash, showPaymentModal]);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -439,27 +631,18 @@ export default function OrderDetailsPage() {
         return "redeeming";
       }
 
-      // If we have a transaction hash (user approved transaction in MetaMask)
-      // writeContractData only exists AFTER user approves the transaction
-      // Only advance to redeeming if we have the hash (user approved)
+
       if (writeContractData) {
         return "redeeming";
       }
 
-      // Deposit detected but no destination transaction yet
-      // If secret is generated but no transaction hash exists yet
-      // we're awaiting redeem approval - user needs to approve the MetaMask popup
-      // writeContractData only exists AFTER user approves, so if it doesn't exist, we're still awaiting
       if (secretData && !writeContractData) {
-        // User hasn't approved yet, still in awaiting_redeem (clock icon)
         return "awaiting_redeem";
       }
 
-      // Deposit detected, but secret not generated yet
       return "deposit_detected";
     }
 
-    // Check if deposit address exists (awaiting deposit)
     if (orderToCheck.source_intent.deposit_address) {
       return "awaiting_deposit";
     }
@@ -474,6 +657,15 @@ export default function OrderDetailsPage() {
   const sourceInfo = order ? getAssetInfo(order.source_intent.asset) : null;
   const destinationInfo = order
     ? getAssetInfo(order.destination_intent.asset)
+    : null;
+
+  // Check if payment transaction was submitted (has transaction hash from order)
+  const initTxHash = order?.source_intent.transactions.create_tx || null;
+  const showPaymentSuccess = !!initTxHash;
+  
+  // Get explorer URL for payment transaction
+  const paymentExplorerUrl = initTxHash && order 
+    ? getExplorerUrl(order.source_intent.asset, initTxHash) 
     : null;
 
   return (
@@ -579,48 +771,167 @@ export default function OrderDetailsPage() {
                 </div>
               </div>
 
-              {/* Deposit Address & QR Code */}
+              {/* Deposit Address & QR Code or Success Message */}
               {depositAddress && (
                 <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Deposit Address
-                  </h2>
-                  <div className="space-y-4">
-                    {/* Address */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-mono text-gray-700 break-all">
-                          {depositAddress}
+                  {showPaymentSuccess ? (
+                    /* Success Message */
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle2 className="w-6 h-6 text-green-600" />
+                          </div>
+                          <div>
+                            <h2 className="text-lg font-semibold text-gray-900">
+                              Successfully Initiated
+                            </h2>
+                            <p className="text-sm text-gray-500">
+                              Your payment transaction has been submitted
+                            </p>
+                          </div>
+                        </div>
+                        {paymentExplorerUrl && (
+                          <a
+                            href={paymentExplorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors font-medium text-sm"
+                          >
+                            <span>View in Explorer</span>
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    /* QR Code and Button Section */
+                    <>
+                      <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                        Deposit Address
+                      </h2>
+                      <div className="space-y-4">
+                        {/* Address */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-mono text-gray-700 break-all">
+                              {depositAddress}
+                            </p>
+                            <button
+                              onClick={() => copyToClipboard(depositAddress)}
+                              className="flex-shrink-0 p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                              title="Copy address"
+                            >
+                              {copiedAddress ? (
+                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                              ) : (
+                                <Copy className="w-5 h-5 text-gray-600" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* QR Code */}
+                        <div className="flex justify-center p-4 bg-white rounded-lg border border-gray-200">
+                          <QRCodeSVG
+                            value={depositAddress}
+                            size={200}
+                            level="M"
+                            className="w-full max-w-[200px]"
+                          />
+                        </div>
+
+                        {/* Pay with Connected Wallet Button */}
+                        {isConnected && (
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => setShowPaymentModal(true)}
+                              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
+                            >
+                              Pay with Connected Wallet
+                            </button>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-gray-500 text-center">
+                          Scan this QR code or copy the address above to send your
+                          deposit
                         </p>
-                        <button
-                          onClick={() => copyToClipboard(depositAddress)}
-                          className="flex-shrink-0 p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                          title="Copy address"
-                        >
-                          {copiedAddress ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <Copy className="w-5 h-5 text-gray-600" />
-                          )}
-                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Payment Modal */}
+              {showPaymentModal && order && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-200"
+                  >
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                      Confirm Payment
+                    </h2>
+
+                    <div className="space-y-4 mb-6">
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="text-sm text-gray-500 mb-1">Amount</div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {formatAmount(order.source_intent.amount, 8)}{" "}
+                          {sourceInfo?.symbol}
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="text-sm text-gray-500 mb-1">To Address</div>
+                        <div className="text-xs font-mono text-gray-700 break-all">
+                          {depositAddress}
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="text-sm text-gray-500 mb-1">Network</div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {sourceInfo?.chain}
+                        </div>
                       </div>
                     </div>
 
-                    {/* QR Code */}
-                    <div className="flex justify-center p-4 bg-white rounded-lg border border-gray-200">
-                      <QRCodeSVG
-                        value={depositAddress}
-                        size={200}
-                        level="M"
-                        className="w-full max-w-[200px]"
-                      />
-                    </div>
+                    {paymentError && (
+                      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-600">{paymentError}</p>
+                      </div>
+                    )}
 
-                    <p className="text-xs text-gray-500 text-center">
-                      Scan this QR code or copy the address above to send your
-                      deposit
-                    </p>
-                  </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setShowPaymentModal(false);
+                          setPaymentError(null);
+                        }}
+                        disabled={isPaying}
+                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handlePayment}
+                        disabled={isPaying || !isConnected}
+                        className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isPaying ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          "Confirm Payment"
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
                 </div>
               )}
 
