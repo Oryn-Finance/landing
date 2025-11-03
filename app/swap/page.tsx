@@ -48,21 +48,22 @@ export default function SwapPage() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-[calc(100vh-56px)] xs:min-h-[calc(100vh-64px)] md:min-h-[calc(100vh-80px)] flex items-center justify-center px-3 xs:px-4 sm:px-6 lg:px-8 py-4 xs:py-6 md:py-12">
+      <div className="relative z-10 min-h-screen flex items-center justify-center ">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="w-fit min-w-xl"
+          initial={{ opacity: 0, y: 30, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            duration: 0.3,
+            delay: 0.2,
+            type: "spring",
+            damping: 20,
+            stiffness: 250,
+          }}
+          className="w-fit max-w-2xl"
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="scale-90 origin-top rounded-4xl bg-white/10 backdrop-blur-lg border border-white/10 py-8 p-6"
-          >
+          <div className="rounded-4xl bg-white/10 backdrop-blur-lg border border-white/10 p-4">
             <Swap />
-          </motion.div>
+          </div>
         </motion.div>
       </div>
 

@@ -1,50 +1,49 @@
-import * as bitcoin from 'bitcoinjs-lib';
-import * as ecc from 'tiny-secp256k1';
-import { generateInternalkey } from './internalKey';
-import type { Taptree } from 'bitcoinjs-lib/src/types';
-import { serializeTaprootSignature } from 'bitcoinjs-lib/src/psbt/bip371';
-import type { BitcoinUTXO } from './provider/provider.interface';
-import { Urgency } from './provider/provider.interface';
-import { assert, xOnlyPubkey, serializeScript, sortLeaves } from '../utils';
-import type { IBitcoinWallet } from './wallet/wallet.interface';
+import * as bitcoin from "bitcoinjs-lib";
+import * as ecc from "tiny-secp256k1";
+import { generateInternalkey } from "./internalKey";
+import type { Taptree } from "bitcoinjs-lib/src/types";
+import { serializeTaprootSignature } from "bitcoinjs-lib/src/psbt/bip371";
+import type { BitcoinUTXO } from "./provider/provider.interface";
+import { Urgency } from "./provider/provider.interface";
+import { assert, xOnlyPubkey, serializeScript, sortLeaves } from "../utils";
+import type { IBitcoinWallet } from "./wallet/wallet.interface";
 
 export const GardenErrors = {
   WALLET_NOT_FOUND: (from: boolean): string =>
     `${
-      from ? 'from' : 'to'
+      from ? "from" : "to"
     } asset wallet not found; please pass the wallet associated with the chain of the asset swapping`,
 
-  CHAIN_WALLET_NOT_FOUND: (blockchain: 'EVM' | 'Bitcoin'): string =>
+  CHAIN_WALLET_NOT_FOUND: (blockchain: "EVM" | "Bitcoin"): string =>
     `no ${blockchain} wallet found`,
 };
 
 export const SwapperErrors = {
-  NO_ACTION: 'no actions can be performed in this state',
-  NO_SECRET: 'secret not found in order',
+  NO_ACTION: "no actions can be performed in this state",
+  NO_SECRET: "secret not found in order",
   INVALID_ACTION: (
-    action: 'init' | 'redeem' | 'refund',
-    status: number,
+    action: "init" | "redeem" | "refund",
+    status: number
   ): string => `can not ${action} on status: ${status}`,
 };
 
 export const htlcErrors = {
-  secretMismatch: 'invalid secret',
-  secretHashLenMismatch: 'secret hash should be 32 bytes',
-  pubkeyLenMismatch: 'pubkey should be 32 bytes',
-  zeroOrNegativeExpiry: 'expiry should be greater than 0',
-  htlcAddressGenerationFailed: 'failed to generate htlc address',
-  notFunded: 'address not funded',
-  noCounterpartySigs: 'counterparty signatures are required',
+  secretMismatch: "invalid secret",
+  secretHashLenMismatch: "secret hash should be 32 bytes",
+  pubkeyLenMismatch: "pubkey should be 32 bytes",
+  zeroOrNegativeExpiry: "expiry should be greater than 0",
+  htlcAddressGenerationFailed: "failed to generate htlc address",
+  notFunded: "address not funded",
+  noCounterpartySigs: "counterparty signatures are required",
   counterPartySigNotFound: (utxo: string) =>
-    'counterparty signature not found for utxo ' + utxo,
+    "counterparty signature not found for utxo " + utxo,
   invalidCounterpartySigForUTXO: (utxo: string) =>
-    'invalid counterparty signature for utxo ' + utxo,
+    "invalid counterparty signature for utxo " + utxo,
   htlcNotExpired: (blocks: number) =>
     `HTLC not expired, need more ${blocks} blocks`,
-  controlBlockGenerationFailed: 'failed to generate control block',
-  invalidLeaf: 'invalid leaf',
+  controlBlockGenerationFailed: "failed to generate control block",
+  invalidLeaf: "invalid leaf",
 };
-
 
 export enum Leaf {
   REFUND,
@@ -56,7 +55,7 @@ const LEAF_VERSION = 0xc0;
 
 bitcoin.initEccLib(ecc);
 
-export class GardenHTLC  {
+export class GardenHTLC {
   /**
    * Signer of the HTLC can be either the initiator or the redeemer
    */
@@ -94,7 +93,7 @@ export class GardenHTLC  {
     initiatorPubkey: string,
     expiry: number,
     network: bitcoin.networks.Network,
-    utxoHashes?: string[],
+    utxoHashes?: string[]
   ) {
     this.secretHash = secretHash;
     this.redeemerPubkey = redeemerPubkey;
@@ -127,21 +126,21 @@ export class GardenHTLC  {
     initiatorPubkey: string,
     redeemerPubkey: string,
     expiry: number,
-    utxoHashes?: string[],
+    utxoHashes?: string[]
   ): Promise<GardenHTLC> {
     // trim 0x prefix if present
-    secretHash = secretHash.startsWith('0x') ? secretHash.slice(2) : secretHash;
+    secretHash = secretHash.startsWith("0x") ? secretHash.slice(2) : secretHash;
 
     assert(secretHash.length === 64, htlcErrors.secretHashLenMismatch);
     // initiator and redeemer pubkey should be either x-only 32 bytes or normal 33 bytes pubkey which
     // will be trimmed to x-only pubkey later
     assert(
       initiatorPubkey.length === 64 || initiatorPubkey.length === 66,
-      `initiator ${htlcErrors.pubkeyLenMismatch}`,
+      `initiator ${htlcErrors.pubkeyLenMismatch}`
     );
     assert(
       redeemerPubkey.length === 64 || redeemerPubkey.length === 66,
-      `redeemer ${htlcErrors.pubkeyLenMismatch}`,
+      `redeemer ${htlcErrors.pubkeyLenMismatch}`
     );
     assert(expiry > 0, htlcErrors.zeroOrNegativeExpiry);
 
@@ -150,11 +149,11 @@ export class GardenHTLC  {
       signer,
       initiateAmount,
       secretHash,
-      xOnlyPubkey(redeemerPubkey).toString('hex'),
-      xOnlyPubkey(initiatorPubkey).toString('hex'),
+      xOnlyPubkey(redeemerPubkey).toString("hex"),
+      xOnlyPubkey(initiatorPubkey).toString("hex"),
       expiry,
       network,
-      utxoHashes,
+      utxoHashes
     );
   }
 
@@ -182,7 +181,7 @@ export class GardenHTLC  {
     options?: {
       fee?: number;
       vSize?: number;
-    },
+    }
   ) {
     const tx = new bitcoin.Transaction();
     tx.version = 2;
@@ -214,7 +213,7 @@ export class GardenHTLC  {
     if (balance === 0) throw new Error(`${address} ${htlcErrors.notFunded}`);
 
     for (let i = 0; i < utxos.length; i++) {
-      tx.addInput(Buffer.from(utxos[i].txid, 'hex').reverse(), utxos[i].vout);
+      tx.addInput(Buffer.from(utxos[i].txid, "hex").reverse(), utxos[i].vout);
     }
 
     if (options?.vSize) {
@@ -225,7 +224,7 @@ export class GardenHTLC  {
 
       tx.addOutput(
         bitcoin.address.toOutputScript(receiver, this.network),
-        amountAfterFees,
+        amountAfterFees
       );
 
       return { tx, usedUtxos: utxos };
@@ -236,7 +235,7 @@ export class GardenHTLC  {
       (await provider.suggestFee(address, balance, Urgency.MEDIUM));
     tx.addOutput(
       bitcoin.address.toOutputScript(receiver, this.network),
-      balance - fee,
+      balance - fee
     );
 
     return { tx, usedUtxos: utxos, fee, balance };
@@ -255,7 +254,7 @@ export class GardenHTLC  {
     ).suggestFee(
       await this.signer.getAddress(),
       this.initiateAmount,
-      Urgency.MEDIUM,
+      Urgency.MEDIUM
     );
 
     return await this.signer.send(this.address(), this.initiateAmount, fee);
@@ -279,13 +278,13 @@ export class GardenHTLC  {
         outputs,
         values,
         hashType,
-        redeemLeafHash,
+        redeemLeafHash
       );
 
       const signature = await this.signer.signSchnorr(hash);
       tx.setWitness(i, [
         serializeTaprootSignature(signature, hashType),
-        Buffer.from(secret, 'hex'),
+        Buffer.from(secret, "hex"),
         this.redeemLeaf(),
         this.generateControlBlockFor(Leaf.REDEEM),
       ]);
@@ -308,7 +307,7 @@ export class GardenHTLC  {
     usedUtxos.forEach(({ value }) => {
       tx.addOutput(
         outputAddress,
-        value - (value === maxUtxoValue ? txFee ?? 0 : 0),
+        value - (value === maxUtxoValue ? txFee ?? 0 : 0)
       );
     });
 
@@ -326,7 +325,7 @@ export class GardenHTLC  {
         outputs,
         values,
         hashType,
-        instantRefundLeafHash,
+        instantRefundLeafHash
       );
 
       const signature = await this.signer.signSchnorr(hash);
@@ -351,11 +350,11 @@ export class GardenHTLC  {
       bitcoin.Transaction.SIGHASH_ANYONECANPAY;
 
     for (let i = 0; i < hash.length; i++) {
-      const _hash = Buffer.from(hash[i], 'hex');
+      const _hash = Buffer.from(hash[i], "hex");
 
       const signature = await this.signer.signSchnorr(_hash);
       signatures.push(
-        serializeTaprootSignature(signature, hashType).toString('hex'),
+        serializeTaprootSignature(signature, hashType).toString("hex")
       );
     }
     return signatures;
@@ -368,13 +367,13 @@ export class GardenHTLC  {
    */
   async instantRefund(
     counterPartySigs: { utxo: string; sig: string }[],
-    fee?: number,
+    fee?: number
   ) {
     assert(counterPartySigs.length > 0, htlcErrors.noCounterpartySigs);
 
     const { tx, usedUtxos } = await this._buildRawTx(
       await this.signer.getAddress(),
-      { fee },
+      { fee }
     );
 
     for (const utxo of usedUtxos) {
@@ -397,28 +396,28 @@ export class GardenHTLC  {
         outputs,
         values,
         hashType,
-        instantRefundLeafHash,
+        instantRefundLeafHash
       );
       if (
         !ecc.verifySchnorr(
           hash,
-          Buffer.from(this.redeemerPubkey, 'hex'),
-          Buffer.from(counterPartySigs[i].sig, 'hex'),
+          Buffer.from(this.redeemerPubkey, "hex"),
+          Buffer.from(counterPartySigs[i].sig, "hex")
         )
       ) {
         throw new Error(
-          htlcErrors.invalidCounterpartySigForUTXO(counterPartySigs[i].utxo),
+          htlcErrors.invalidCounterpartySigForUTXO(counterPartySigs[i].utxo)
         );
       }
 
       const signature = await this.signer.signSchnorr(hash);
-      const txid = Buffer.from(tx.ins[i].hash).reverse().toString('hex');
+      const txid = Buffer.from(tx.ins[i].hash).reverse().toString("hex");
       const counterPartySig = counterPartySigs.find((sig) => sig.utxo === txid);
       if (!counterPartySig)
         throw new Error(htlcErrors.counterPartySigNotFound(txid));
 
       tx.setWitness(i, [
-        Buffer.from(counterPartySig.sig, 'hex'),
+        Buffer.from(counterPartySig.sig, "hex"),
         signature,
         this.instantRefundLeaf(),
         this.generateControlBlockFor(Leaf.INSTANT_REFUND),
@@ -452,7 +451,7 @@ export class GardenHTLC  {
     // First build and sign tx to calculate vSize
     const { tx: tempTx, usedUtxos: utxos } = await this._buildRawTx(
       receiverAddress,
-      { fee: 0 },
+      { fee: 0 }
     );
 
     const redeemLeafHash = this.leafHash(Leaf.REDEEM);
@@ -467,13 +466,13 @@ export class GardenHTLC  {
         outputs,
         values,
         hashType,
-        redeemLeafHash,
+        redeemLeafHash
       );
       const signature = await this.signer.signSchnorr(hash);
 
       tempTx.setWitness(i, [
         signature,
-        Buffer.from(secret, 'hex'),
+        Buffer.from(secret, "hex"),
         this.redeemLeaf(),
         this.generateControlBlockFor(Leaf.REDEEM),
       ]);
@@ -491,13 +490,13 @@ export class GardenHTLC  {
         outputs,
         values,
         hashType,
-        redeemLeafHash,
+        redeemLeafHash
       );
       const signature = await this.signer.signSchnorr(hash);
 
       tx.setWitness(i, [
         signature,
-        Buffer.from(secret, 'hex'),
+        Buffer.from(secret, "hex"),
         this.redeemLeaf(),
         this.generateControlBlockFor(Leaf.REDEEM),
       ]);
@@ -512,7 +511,7 @@ export class GardenHTLC  {
   async refund(receiver?: string, fee?: number): Promise<string> {
     const { tx, usedUtxos } = await this._buildRawTx(
       receiver ?? (await this.signer.getAddress()),
-      { fee },
+      { fee }
     );
 
     const [canRefund, needMoreBlocks] = await this.canRefund(usedUtxos);
@@ -534,7 +533,7 @@ export class GardenHTLC  {
         outputs,
         values,
         hashType,
-        refundLeafHash,
+        refundLeafHash
       );
       const signature = await this.signer.signSchnorr(hash);
 
@@ -619,20 +618,20 @@ export class GardenHTLC  {
     let leafScript = this.redeemLeaf();
     if (leaf === Leaf.REFUND) leafScript = this.refundLeaf();
     if (leaf === Leaf.INSTANT_REFUND) leafScript = this.instantRefundLeaf();
-    return bitcoin.crypto.taggedHash('TapLeaf', serializeScript(leafScript));
+    return bitcoin.crypto.taggedHash("TapLeaf", serializeScript(leafScript));
   }
 
   private refundLeaf(): Buffer {
     return bitcoin.script.fromASM(
       `
-			${bitcoin.script.number.encode(this.expiry).toString('hex')}
+			${bitcoin.script.number.encode(this.expiry).toString("hex")}
 			OP_CHECKSEQUENCEVERIFY
 			OP_DROP
-			${this.initiatorPubkey}	
+			${this.initiatorPubkey}
 			OP_CHECKSIG
 			`
         .trim()
-        .replace(/\s+/g, ' '),
+        .replace(/\s+/g, " ")
     );
   }
 
@@ -646,7 +645,7 @@ export class GardenHTLC  {
 			OP_CHECKSIG
 			`
         .trim()
-        .replace(/\s+/g, ' '),
+        .replace(/\s+/g, " ")
     );
   }
 
@@ -661,7 +660,7 @@ export class GardenHTLC  {
 			OP_NUMEQUAL
 			`
         .trim()
-        .replace(/\s+/g, ' '),
+        .replace(/\s+/g, " ")
     );
   }
 
@@ -696,12 +695,12 @@ export class GardenHTLC  {
       case Leaf.REDEEM: {
         const sortedRefundLeaves = sortLeaves(
           refundLeafHash,
-          instantRefundLeafHash,
+          instantRefundLeafHash
         );
         return [
           bitcoin.crypto.taggedHash(
-            'TapBranch',
-            Buffer.concat(sortedRefundLeaves),
+            "TapBranch",
+            Buffer.concat(sortedRefundLeaves)
           ),
         ];
       }

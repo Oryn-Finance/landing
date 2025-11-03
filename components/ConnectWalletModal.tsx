@@ -297,8 +297,8 @@ export function ConnectWalletModal({
                 <button
                   className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
                     activeTab === "starknet"
-                      ? "bg-purple-50 text-purple-700 border-b-2 border-purple-500"
-                      : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
+                      ? "bg-purple-500/20 text-purple-300 border-b-2 border-purple-500"
+                      : "bg-white/5 text-gray-400 border-b-2 border-transparent hover:bg-white/10 hover:text-gray-300"
                   }`}
                   onClick={() => setActiveTab("starknet")}
                 >
@@ -318,11 +318,9 @@ export function ConnectWalletModal({
                       return (
                         <motion.button
                           key={connector.uid}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
                           onClick={() => handleEVMConnect(connector)}
                           disabled={loadingEVM}
-                          className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl hover:border-purple-500/60 hover:bg-purple-500/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                             {iconUrl ? (
@@ -367,11 +365,9 @@ export function ConnectWalletModal({
                         return (
                           <motion.button
                             key={wallet.id || index}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
                             onClick={() => handleBTCConnect(wallet)}
                             disabled={loadingBTC || !wallet.available}
-                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl hover:border-orange-500/60 hover:bg-orange-500/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                               {iconUrl ? (
@@ -429,11 +425,9 @@ export function ConnectWalletModal({
                         return (
                           <motion.button
                             key={wallet.id || index}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
                             onClick={() => handleStarknetConnect(wallet)}
                             disabled={loadingStarknet || !wallet.available}
-                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                               {iconUrl ? (
@@ -445,32 +439,32 @@ export function ConnectWalletModal({
                                   height={32}
                                 />
                               ) : (
-                                <span className="w-8 h-8 flex items-center justify-center bg-purple-100 rounded">
-                                  <span className="text-lg font-bold text-purple-600">
+                                <span className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded">
+                                  <span className="text-lg font-bold text-gray-300">
                                     {(wallet.name || "?")[0]}
                                   </span>
                                 </span>
                               )}
                             </div>
                             <div className="flex-1 text-left min-w-0">
-                              <p className="font-medium text-gray-900 text-sm md:text-base truncate">
+                              <p className="font-medium text-white text-sm md:text-base truncate">
                                 {wallet.name || "Starknet Wallet"}
                               </p>
-                              <p className="text-xs md:text-sm text-gray-500 truncate">
+                              <p className="text-xs md:text-sm text-gray-400 truncate">
                                 {wallet.description ||
                                   "Connect your Starknet wallet"}
                               </p>
                             </div>
                             {loadingStarknet && (
-                              <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
                             )}
                           </motion.button>
                         );
                       })
                     ) : (
                       <div className="col-span-2 text-center py-8">
-                        <Zap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500">
+                        <Zap className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+                        <p className="text-gray-300">
                           No Starknet wallets available
                         </p>
                         <p className="text-sm text-gray-400 mt-1">

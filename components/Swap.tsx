@@ -175,7 +175,7 @@ const Swap: React.FC<SwapProps> = () => {
       <div className="w-full mx-auto flex items-center flex-col rounded-3xl">
         <div className="relative w-full">
           <div className="w-full">
-            <div className="bg-white/10 mb-4 w-full rounded-[30px] border-b border-x border-gray-700/40 p-4">
+            <div className="bg-white/10 mb-4 w-full rounded-[20px] border-b border-x border-gray-700/40 p-4">
               <label className="block text-lg font-medium text-white">
                 You Pay
               </label>
@@ -272,8 +272,8 @@ const Swap: React.FC<SwapProps> = () => {
             <div
               className={`bg-white/10 w-full duration-300 ${
                 !quote || !sendValue || parseFloat(sendValue) <= 0
-                  ? "rounded-[30px]"
-                  : "rounded-[30px]"
+                  ? "rounded-[20px]"
+                  : "rounded-[20px]"
               } border-t border-x ${
                 !quote || !sendValue || parseFloat(sendValue) <= 0
                   ? "border-b-0"
@@ -337,7 +337,7 @@ const Swap: React.FC<SwapProps> = () => {
             parseFloat(sendAmount) > 0 && (
               <motion.div
                 initial={{ height: 0, opacity: 0, y: 10, marginTop: 0 }}
-                animate={{ height: 274, opacity: 1, y: 0, marginTop: 16 }}
+                animate={{ height: 248, opacity: 1, y: 0, marginTop: 16 }}
                 exit={{
                   height: 0,
                   opacity: 0,
@@ -352,11 +352,11 @@ const Swap: React.FC<SwapProps> = () => {
                 }}
                 className="w-full overflow-hidden"
               >
-                <div className="bg-white/10 w-full rounded-[30px] border-t border-x border-gray-700/40 p-6">
+                <div className="bg-white/10 w-full rounded-[20px] border-t border-x border-gray-700/40 p-6">
                   <label className="block text-lg font-medium text-white mb-3">
                     Fees & Rate
                   </label>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <div className="flex items-center justify-between py-2 border-b border-gray-700/40">
                       <span className="text-sm text-gray-300">Fee (Bips)</span>
                       <span className="text-sm font-medium text-white">

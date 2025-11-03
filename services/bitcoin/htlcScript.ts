@@ -1,25 +1,25 @@
-import { type Network, script, payments } from 'bitcoinjs-lib';
-import type { AtomicSwapConfig } from './ASConfig';
-import { address as bitcoinjsAddress } from 'bitcoinjs-lib';
-import { isErrorWithMessage } from '../utils';
+import { type Network, script, payments } from "bitcoinjs-lib";
+import type { AtomicSwapConfig } from "./ASConfig";
+import { address as bitcoinjsAddress } from "bitcoinjs-lib";
+import { isErrorWithMessage } from "../utils";
 
 export const getHTLCScript = (
   swapConfig: AtomicSwapConfig,
   network: Network,
-  legacy = false,
+  legacy = false
 ) => {
   const getFormattedAddress = (address: string) => {
     try {
-      address = bitcoinjsAddress.fromBech32(address).data.toString('hex');
+      address = bitcoinjsAddress.fromBech32(address).data.toString("hex");
     } catch (err) {
       if (isErrorWithMessage(err)) {
         if (
-          err.message.includes('Mixed-case string') ||
-          err.message.includes('too short')
+          err.message.includes("Mixed-case string") ||
+          err.message.includes("too short")
         ) {
           address = bitcoinjsAddress
             .fromBase58Check(address)
-            .hash.toString('hex');
+            .hash.toString("hex");
         }
       } else throw new Error(String(err));
     }
@@ -35,7 +35,7 @@ export const getHTLCScript = (
                 OP_HASH160
                 ${getFormattedAddress(swapConfig.recipientAddress.address)}
             OP_ELSE
-                ${script.number.encode(swapConfig.expiryBlocks).toString('hex')}
+                ${script.number.encode(swapConfig.expiryBlocks).toString("hex")}
                 OP_CHECKSEQUENCEVERIFY
                 OP_DROP
                 OP_DUP
@@ -46,16 +46,16 @@ export const getHTLCScript = (
               OP_CHECKSIG
         `
       .trim()
-      .replace(/\s+/g, ' '),
+      .replace(/\s+/g, " ")
   );
 
-  const p2wsh = payments[legacy ? 'p2sh' : 'p2wsh']({
+  const p2wsh = payments[legacy ? "p2sh" : "p2wsh"]({
     redeem: {
       output: htlcScript,
     },
     network,
   });
-  if (!p2wsh.address) throw new Error('Could not build address');
+  if (!p2wsh.address) throw new Error("Could not build address");
 
   return {
     script: htlcScript,

@@ -10,13 +10,25 @@ import OrdersSidebar from "../../../components/OrdersSidebar";
 import PixelBlast from "@/components/ui/PixelBlast";
 import { API_URLS } from "../../../constants/constants";
 import type { Order, OrderStatus } from "../../../types/order";
-import {  Copy, CheckCircle2, Clock, Loader2} from "lucide-react";
-import { useSignMessage, useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useSendTransaction, useWalletClient } from "wagmi";
+import { Copy, CheckCircle2, Clock, Loader2, ArrowLeft } from "lucide-react";
+import {
+  useSignMessage,
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useSwitchChain,
+  useSendTransaction,
+  useWalletClient,
+} from "wagmi";
 import { getSecret, type SecretData } from "../../../utils/secretManager";
 import { with0x, trim0x, getChainIdFromAsset } from "../../../utils/redeem";
-import { executeRedeem, getRedeemTypeFromAsset } from "../../../utils/redeem/index";
+import {
+  executeRedeem,
+  getRedeemTypeFromAsset,
+} from "../../../utils/redeem/index";
 import { erc20Abi, type WalletClient } from "viem";
 import { useAssetsStore } from "@/store/assetsStore";
+import { ExternalLink } from "lucide-react";
 import Image from "next/image";
 
 const ASSET_LOGOS: Record<string, string> = {
@@ -155,7 +167,28 @@ function getAssetInfo(assetString: string): { chain: string; symbol: string } {
   return { chain: "Unknown", symbol: assetString.toUpperCase() };
 }
 
-function formatAmount(amount: string, decimals: number = 8): string {
+function getAssetDecimals(assetString: string): number {
+  const parts = assetString.split(":");
+  const symbol = parts[1]?.toLowerCase() || "";
+
+  // Common decimals by symbol
+  const decimalsMap: Record<string, number> = {
+    btc: 8,
+    bitcoin: 8,
+    eth: 18,
+    ethereum: 18,
+    avax: 18,
+    usdc: 6,
+    usdt: 6,
+    wbtc: 8,
+    strk: 18,
+  };
+
+  return decimalsMap[symbol] || 8;
+}
+
+function formatAmount(amount: string, assetString?: string): string {
+  const decimals = assetString ? getAssetDecimals(assetString) : 8;
   const num = BigInt(amount);
   const divisor = BigInt(10 ** decimals);
   const whole = num / divisor;
@@ -191,7 +224,7 @@ export default function OrderDetailsPage() {
 
   const { address, isConnected, chainId } = useAccount();
   const { signMessageAsync } = useSignMessage();
-  const { data: walletClient } = useWalletClient()
+  const { data: walletClient } = useWalletClient();
   const { switchChain } = useSwitchChain();
   const { assets } = useAssetsStore();
 
@@ -452,7 +485,10 @@ export default function OrderDetailsPage() {
     }
 
     // Check if both intents are created
-    if (!order.source_intent.transactions.create_tx || !order.destination_intent.transactions.create_tx) {
+    if (
+      !order.source_intent.transactions.create_tx ||
+      !order.destination_intent.transactions.create_tx
+    ) {
       setRedeemError("Both intents must be created before redeeming");
       return;
     }
@@ -486,7 +522,7 @@ export default function OrderDetailsPage() {
           swapId: order.destination_intent.swap_id,
           secret: secretData.secret,
           chainId: requiredChainId,
-          wallet: walletClient as unknown as WalletClient
+          wallet: walletClient as unknown as WalletClient,
         });
 
         if (result && !result.success) {
@@ -511,7 +547,7 @@ export default function OrderDetailsPage() {
           secret: secretData.secret,
           htlcAddress: order.destination_intent.deposit_address,
           recipientAddress: order.destination_intent.recipient,
-          wallet: walletClient as unknown as WalletClient
+          wallet: walletClient as unknown as WalletClient,
         });
 
         if (result && !result.success) {
@@ -534,7 +570,7 @@ export default function OrderDetailsPage() {
           escrowAddress: order.destination_intent.escrow_address,
           swapId: order.destination_intent.swap_id,
           secret: secretData.secret,
-          wallet: walletClient as unknown as WalletClient
+          wallet: walletClient as unknown as WalletClient,
         });
 
         if (result && !result.success) {
@@ -546,7 +582,9 @@ export default function OrderDetailsPage() {
           setIsRedeeming(false);
         }
       } else {
-        setRedeemError(`Unsupported redeem type for asset: ${destinationAsset}`);
+        setRedeemError(
+          `Unsupported redeem type for asset: ${destinationAsset}`
+        );
         setIsRedeeming(false);
       }
     } catch (err) {
@@ -575,7 +613,9 @@ export default function OrderDetailsPage() {
   // Handle write contract errors
   useEffect(() => {
     if (writeContractError) {
-      setRedeemError(writeContractError.message || "Failed to send transaction");
+      setRedeemError(
+        writeContractError.message || "Failed to send transaction"
+      );
       setIsRedeeming(false);
     }
   }, [writeContractError]);
@@ -598,7 +638,12 @@ export default function OrderDetailsPage() {
       handleGenerateSecret();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order?.source_intent.transactions.create_tx, secretData, isConnected, address]);
+  }, [
+    order?.source_intent.transactions.create_tx,
+    secretData,
+    isConnected,
+    address,
+  ]);
 
   // Auto-call redeem when both intents are created and secret is generated
   useEffect(() => {
@@ -704,7 +749,10 @@ export default function OrderDetailsPage() {
       setShowPaymentModal(false);
       // Refresh order after payment
       setTimeout(() => fetchOrder(), 2000);
-    } else if (nativePaymentReceipt && nativePaymentReceipt.status === "reverted") {
+    } else if (
+      nativePaymentReceipt &&
+      nativePaymentReceipt.status === "reverted"
+    ) {
       setPaymentError("Transaction reverted. Please try again.");
       setIsPaying(false);
     }
@@ -724,8 +772,18 @@ export default function OrderDetailsPage() {
 
   // Update isPaying based on wagmi states
   useEffect(() => {
-    setIsPaying(isWritingPayment || isSendingNative || isWaitingForPaymentReceipt || isWaitingForNativeReceipt);
-  }, [isWritingPayment, isSendingNative, isWaitingForPaymentReceipt, isWaitingForNativeReceipt]);
+    setIsPaying(
+      isWritingPayment ||
+        isSendingNative ||
+        isWaitingForPaymentReceipt ||
+        isWaitingForNativeReceipt
+    );
+  }, [
+    isWritingPayment,
+    isSendingNative,
+    isWaitingForPaymentReceipt,
+    isWaitingForNativeReceipt,
+  ]);
 
   // Close payment modal when transaction hash is received
   useEffect(() => {
@@ -751,21 +809,21 @@ export default function OrderDetailsPage() {
       order?.destination_intent.transactions.create_tx
   );
 
-  // Check if redeemed (has claim_tx or state is redeeming/completed)
+  // Check if redeemed (has claim_tx) - this means the swap was successfully completed
   const isRedeemed = Boolean(
     order?.source_intent.transactions.claim_tx ||
-      order?.destination_intent.transactions.claim_tx ||
-      order?.source_intent.state === "redeeming" ||
-      order?.destination_intent.state === "redeeming" ||
-      order?.source_intent.state === "completed" ||
-      order?.destination_intent.state === "completed"
+      order?.destination_intent.transactions.claim_tx
   );
 
-  // Check if completed/claimed
-  const isClaimed = Boolean(
-    order?.source_intent.state === "completed" ||
-      order?.destination_intent.state === "completed"
+  // Check if refunded (has cancel_tx) - this means the swap was cancelled/refunded
+  const isRefunded = Boolean(
+    order?.source_intent.transactions.cancel_tx ||
+      order?.destination_intent.transactions.cancel_tx
   );
+
+  // Check if completed/claimed - if redeemed (has claim_tx), it's always completed
+  // Only show as completed if redeemed, otherwise check state (but prioritize redeemed)
+  const isClaimed = isRedeemed;
 
   // Get deposit tx hash (create_tx)
   const depositTxHash =
@@ -820,7 +878,23 @@ export default function OrderDetailsPage() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-[calc(100vh-56px)] xs:min-h-[calc(100vh-64px)] md:min-h-[calc(100vh-80px)] flex items-center justify-center px-3 xs:px-4 sm:px-6 lg:px-8 py-4 xs:py-6 md:py-12">
+      <div className="relative z-10 pt-20 md:pt-24 min-h-screen flex items-center justify-center px-3 xs:px-4 sm:px-6 lg:px-8 py-4 xs:py-6 md:py-12">
+        {/* Back Button */}
+        <motion.button
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          onClick={() => router.push("/swap")}
+          className="fixed top-20 md:top-24 left-4 xs:left-6 sm:left-8 md:left-12 lg:left-16 flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-lg text-gray-300 hover:text-white transition-all cursor-pointer z-40"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm font-medium hidden sm:inline">
+            Back to Swap
+          </span>
+        </motion.button>
+
         {isLoading && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -859,7 +933,7 @@ export default function OrderDetailsPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="scale-90 origin-top rounded-3xl bg-white/5 backdrop-blur-lg border border-white/10 p-6 space-y-4"
+              className="w-full max-w-2xl rounded-3xl bg-white/5 backdrop-blur-lg border border-white/10 p-6 space-y-4 mt-4"
             >
               {/* Order Header - From/To Assets */}
               <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
@@ -881,7 +955,10 @@ export default function OrderDetailsPage() {
                           {sourceInfo.symbol}
                         </span>
                         <span className="text-sm font-medium text-gray-300">
-                          {formatAmount(order.source_intent.amount, 8)}
+                          {formatAmount(
+                            order.source_intent.amount,
+                            order.source_intent.asset
+                          )}
                         </span>
                       </div>
                     </div>
@@ -912,7 +989,10 @@ export default function OrderDetailsPage() {
                           {destinationInfo.symbol}
                         </span>
                         <span className="text-sm font-medium text-gray-300">
-                          {formatAmount(order.destination_intent.amount, 8)}
+                          {formatAmount(
+                            order.destination_intent.amount,
+                            order.destination_intent.asset
+                          )}
                         </span>
                       </div>
                       <div className="relative flex items-center shrink-0">
@@ -926,8 +1006,8 @@ export default function OrderDetailsPage() {
                 </div>
               </div>
 
-              {/* Deposit Address & QR Code */}
-              {sourceDepositAddress && (
+              {/* Deposit Address & QR Code - Only show if deposit not detected */}
+              {sourceDepositAddress && !isDepositDetected && (
                 <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
                   <h2 className="text-base font-semibold text-white mb-3">
                     Deposit Address
@@ -951,45 +1031,107 @@ export default function OrderDetailsPage() {
                         )}
                       </button>
                     </div>
-                    <div className="flex items-center justify-center gap-4 p-4 bg-white rounded-lg">
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 p-4 bg-white rounded-lg">
                       <div className="flex justify-center">
                         <QRCodeSVG
                           value={sourceDepositAddress}
-                          size={180}
+                          size={140}
                           level="M"
-                          className="w-full max-w-[180px]"
+                          className="w-full max-w-[140px]"
                         />
                       </div>
-                      <div className="flex flex-col items-stretch gap-2">
-                        <button
-                          onClick={handlePayment}
-                          disabled={isPaying || !isConnected}
-                          className={`px-4 py-2 rounded-lg transition-colors text-white ${
-                            isPaying || !isConnected
-                              ? "bg-purple-600/50 cursor-not-allowed"
-                              : "bg-purple-600 hover:bg-purple-700"
-                          }`}
-                        >
-                          {isPaying ? (
-                            <span className="inline-flex items-center gap-2">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Processing...
-                            </span>
-                          ) : (
-                            "Pay with connected wallet"
+                      <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
+                        {isConnected &&
+                          order &&
+                          getRedeemTypeFromAsset(order.source_intent.asset) ===
+                            "evm" && (
+                            <button
+                              onClick={handlePayment}
+                              disabled={isPaying}
+                              className={`px-4 py-2 rounded-lg transition-colors text-white text-sm font-medium ${
+                                isPaying
+                                  ? "bg-purple-600/50 cursor-not-allowed"
+                                  : "bg-purple-600 hover:bg-purple-700"
+                              }`}
+                            >
+                              {isPaying ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Processing...
+                                </span>
+                              ) : (
+                                "Send Transaction"
+                              )}
+                            </button>
                           )}
-                        </button>
                         {paymentError && (
-                          <div className="text-xs text-red-400 max-w-[220px]">
+                          <div className="text-xs text-red-400 text-center md:text-left">
                             {paymentError}
                           </div>
                         )}
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 text-center">
-                      Scan this QR code or copy the address above to send your
-                      deposit
+                      {isConnected
+                        ? "Send transaction directly or scan QR code to send deposit"
+                        : "Scan QR code or copy the address above to send your deposit"}
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Transaction Hash - Show when deposit is detected */}
+              {isDepositDetected && depositTxHash && (
+                <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
+                  <h2 className="text-base font-semibold text-white mb-3">
+                    Deposit Transaction
+                  </h2>
+                  <div className="space-y-3">
+                    <div className="bg-white/5 rounded-lg p-3 flex items-center justify-between gap-2">
+                      <p className="text-sm font-mono text-gray-300 break-all flex-1">
+                        {depositTxHash}
+                      </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() =>
+                            copyToClipboard(depositTxHash, "deposit_tx")
+                          }
+                          className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+                          title="Copy transaction hash"
+                        >
+                          {copiedAddress === "deposit_tx" ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <Copy className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                        {getExplorerUrl(
+                          order.source_intent.asset,
+                          depositTxHash
+                        ) && (
+                          <a
+                            href={
+                              getExplorerUrl(
+                                order.source_intent.asset,
+                                depositTxHash
+                              ) || "#"
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+                            title="View on explorer"
+                          >
+                            <ExternalLink className="w-4 h-4 text-purple-400" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="w-4 h-4 text-green-400" />
+                      <span className="text-gray-300">
+                        Deposit transaction confirmed
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1090,6 +1232,10 @@ export default function OrderDetailsPage() {
                           <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                             <CheckCircle2 className="w-4 h-4 text-white" />
                           </div>
+                        ) : isRefunded ? (
+                          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                          </div>
                         ) : isDepositDetected ? (
                           <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center">
                             <Clock className="w-4 h-4 text-white animate-pulse" />
@@ -1106,12 +1252,18 @@ export default function OrderDetailsPage() {
                             className={`text-sm font-medium ${
                               isRedeemed
                                 ? "text-green-400"
+                                : isRefunded
+                                ? "text-orange-400"
                                 : isDepositDetected
                                 ? "text-purple-400"
                                 : "text-gray-500"
                             }`}
                           >
-                            {isRedeemed ? "Redeemed" : "Awaiting Redeem"}
+                            {isRedeemed
+                              ? "Completed"
+                              : isRefunded
+                              ? "Refunded"
+                              : "Awaiting Redeem"}
                           </div>
                           {isRedeemed && claimTxHash && (
                             <button
@@ -1133,7 +1285,7 @@ export default function OrderDetailsPage() {
                             </button>
                           )}
                         </div>
-                        {!isRedeemed && isDepositDetected && (
+                        {!isRedeemed && !isRefunded && isDepositDetected && (
                           <div className="text-xs text-gray-500 mt-1">
                             In progress...
                           </div>
@@ -1144,6 +1296,8 @@ export default function OrderDetailsPage() {
                       className={`absolute left-3 w-0.5 ${
                         isRedeemed
                           ? "bg-green-500"
+                          : isRefunded
+                          ? "bg-orange-500"
                           : isDepositDetected
                           ? "bg-gray-700"
                           : "bg-gray-700"
@@ -1152,12 +1306,16 @@ export default function OrderDetailsPage() {
                     />
                   </div>
 
-                  {/* Step 4: Claimed or Refunded */}
+                  {/* Step 4: Final Status - Completed or Refunded */}
                   <div className="relative">
                     <div className="flex items-start gap-3 pb-4">
                       <div className="shrink-0 mt-0.5 relative z-10">
-                        {isClaimed ? (
+                        {isRedeemed ? (
                           <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                          </div>
+                        ) : isRefunded ? (
+                          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center">
                             <CheckCircle2 className="w-4 h-4 text-white" />
                           </div>
                         ) : (
@@ -1169,10 +1327,18 @@ export default function OrderDetailsPage() {
                       <div className="flex-1 pt-1">
                         <div
                           className={`text-sm font-medium ${
-                            isClaimed ? "text-green-400" : "text-gray-500"
+                            isRedeemed
+                              ? "text-green-400"
+                              : isRefunded
+                              ? "text-orange-400"
+                              : "text-gray-500"
                           }`}
                         >
-                          {isClaimed ? "Claimed" : "Claimed / Refunded"}
+                          {isRedeemed
+                            ? "Completed"
+                            : isRefunded
+                            ? "Refunded"
+                            : "Completed / Refunded"}
                         </div>
                       </div>
                     </div>
