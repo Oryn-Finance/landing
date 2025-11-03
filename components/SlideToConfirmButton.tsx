@@ -103,8 +103,9 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative w-full h-16 bg-gray-200 rounded-full overflow-hidden ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-        } ${className}`}
+      className={`relative w-full h-16 mt-4 bg-gray-200 rounded-full overflow-hidden ${
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+      } ${className}`}
     >
       {/* Filled progress background - purple-blue gradient on left side */}
       <motion.div
@@ -152,8 +153,9 @@ const SlideToConfirmButton: React.FC<SlideToConfirmButtonProps> = ({
             ? undefined
             : { type: "spring", stiffness: 300, damping: 30 }
         }
-        className={`absolute top-2 left-2 w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing z-20 ${isDragging ? "shadow-xl" : ""
-          }`}
+        className={`absolute top-2 left-2 w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing z-20 ${
+          isDragging ? "shadow-xl" : ""
+        }`}
         whileDrag={{ scale: 1.1 }}
         animate={isConfirmed ? { x: maxDrag } : undefined}
       >

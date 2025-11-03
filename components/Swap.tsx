@@ -125,17 +125,17 @@ const Swap: React.FC<SwapProps> = () => {
   };
 
   return (
-    <div className="mx-auto p-6 max-w-xl w-full overflow-x-hidden md:overflow-x-visible">
-      <div className="w-full mx-auto flex items-center flex-col rounded-3xl gap-2">
+    <div className="mx-auto p-6 max-w-xl w-full overflow-x-hidden md:overflow-x-visible scale-80 origin-top">
+      <div className="w-full mx-auto flex items-center flex-col rounded-3xl">
+        <Image
+          src="/toprectangle.png"
+          alt="toprectangle"
+          className="w-full h-10 -mb-1"
+          width={576}
+          height={200}
+        />
         <div className="relative w-full">
           <div className="w-full">
-            <Image
-              src="/toprectangle.png"
-              alt="toprectangle"
-              className="w-full h-10 -mb-1"
-              width={576}
-              height={200}
-            />
             <div className="bg-white mb-4 w-full rounded-b-[30px] border-b border-x border-gray-100 p-4 md:p-6">
               <label className="block text-xl md:text-2xl font-medium text-gray-700 mb-3 md:mb-4">
                 You Pay
@@ -204,7 +204,7 @@ const Swap: React.FC<SwapProps> = () => {
             </div>
           </div>
 
-          <div className="w-full mb-2 relative">
+          <div className="w-full relative">
             <div className="absolute left-1/2 transform -translate-x-1/2 -top-6 w-full flex items-center justify-center z-10 pointer-events-none">
               <motion.button
                 whileHover={{ scale: 1, rotate: 180 }}
@@ -231,7 +231,7 @@ const Swap: React.FC<SwapProps> = () => {
               </motion.button>
             </div>
             <div
-              className={`bg-white w-full ${
+              className={`bg-white w-full duration-300 ${
                 !quote || !sendValue || parseFloat(sendValue) <= 0
                   ? "rounded-t-[30px] rounded-b-none"
                   : "rounded-[30px]"
@@ -241,7 +241,7 @@ const Swap: React.FC<SwapProps> = () => {
                   : "border-b"
               } border-gray-100 p-4 md:p-6`}
             >
-              <label className="block text-xl md:text-2xl font-medium text-gray-700 mb-3 md:mb-4">
+              <label className="block text-xl md:text-2xl font-medium text-gray-700 mb-3">
                 You Receive
               </label>
               <div className="w-full flex items-center justify-between gap-2 md:gap-3">
@@ -287,17 +287,6 @@ const Swap: React.FC<SwapProps> = () => {
                 </div>
               </div>
             </div>
-            {(!quote || !sendValue || parseFloat(sendValue) <= 0) && (
-              <div className="relative mb-4">
-                <Image
-                  src="/bottomrectangle.png"
-                  alt="bottomrectangle"
-                  className="w-full h-10 rounded-b-[30px]"
-                  height={200}
-                  width={576}
-                />
-              </div>
-            )}
           </div>
         </div>
 
@@ -308,15 +297,21 @@ const Swap: React.FC<SwapProps> = () => {
             sendAmount &&
             parseFloat(sendAmount) > 0 && (
               <motion.div
-                initial={{ height: 0, opacity: 0, y: 10 }}
-                animate={{ height: "auto", opacity: 1, y: 0 }}
-                exit={{ height: 0, opacity: 0, y: 10 }}
-                transition={{
-                  height: { duration: 0.45, ease: [0.32, 0.72, 0, 1] },
-                  opacity: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-                  y: { duration: 0.45, ease: [0.32, 0.72, 0, 1] },
+                initial={{ height: 0, opacity: 0, y: 10, marginTop: 0 }}
+                animate={{ height: 274, opacity: 1, y: 0, marginTop: 16 }}
+                exit={{
+                  height: 0,
+                  opacity: 0,
+                  y: 10,
+                  marginTop: 0,
+                  transition: { duration: 0.3, ease: "easeOut" },
                 }}
-                className="w-full mb-4 overflow-hidden"
+                transition={{
+                  type: "spring",
+                  stiffness: 200,
+                  damping: 25,
+                }}
+                className="w-full overflow-hidden"
               >
                 <div className="bg-white w-full rounded-t-[30px] border-t border-x border-gray-100 p-6">
                   <label className="block text-2xl font-medium text-gray-700 mb-3">
@@ -381,38 +376,17 @@ const Swap: React.FC<SwapProps> = () => {
                       )}
                   </div>
                 </div>
-                <motion.div
-                  initial={{ opacity: 0, scaleY: 0 }}
-                  animate={{
-                    opacity: 1,
-                    scaleY: 1,
-                    transition: {
-                      duration: 0.45,
-                      ease: [0.32, 0.72, 0, 1],
-                    },
-                  }}
-                  exit={{
-                    opacity: 0,
-                    scaleY: 0,
-                    transition: {
-                      duration: 0.45,
-                      ease: [0.32, 0.72, 0, 1],
-                    },
-                  }}
-                  style={{ originY: 0 }}
-                >
-                  <Image
-                    src="/bottomrectangle.png"
-                    alt="bottomrectangle"
-                    className="w-full h-10 -mt-1"
-                    height={200}
-                    width={576}
-                  />
-                </motion.div>
               </motion.div>
             )}
         </AnimatePresence>
       </div>
+      <Image
+        src="/bottomrectangle.png"
+        alt="bottomrectangle"
+        className="w-full h-10"
+        height={200}
+        width={576}
+      />
 
       {orderError && (
         <div className="w-full mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">

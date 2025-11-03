@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import axios from "axios";
@@ -60,13 +60,26 @@ export default function OrderDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isOrderCompleteRef = useRef(false);
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      if (!orderId) return;
+    if (!orderId) return;
 
-      setIsLoading(true);
-      setError(null);
+    const fetchOrder = async (isInitialLoad = false) => {
+      // Stop polling if order is already complete
+      if (isOrderCompleteRef.current) {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        return;
+      }
+
+      if (isInitialLoad) {
+        setIsLoading(true);
+        setError(null);
+      }
 
       try {
         const baseUrl = API_URLS.ORDERS.endsWith("/")
@@ -105,18 +118,54 @@ export default function OrderDetailsPage() {
 
         if (orderData) {
           setOrder(orderData);
+          setError(null);
+
+          // Check if order is complete and stop polling
+          if (
+            orderData.source_intent.state === "completed" ||
+            orderData.destination_intent.state === "completed"
+          ) {
+            isOrderCompleteRef.current = true;
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+          }
         } else {
-          setError("Order not found or invalid response format");
+          if (isInitialLoad) {
+            setError("Order not found or invalid response format");
+          }
         }
       } catch (err) {
         console.error("Failed to fetch order:", err);
-        setError("Failed to load order details");
+        if (isInitialLoad) {
+          setError("Failed to load order details");
+        }
       } finally {
-        setIsLoading(false);
+        if (isInitialLoad) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchOrder();
+    // Reset completion flag when orderId changes
+    isOrderCompleteRef.current = false;
+
+    // Initial fetch
+    fetchOrder(true);
+
+    // Set up polling every 2 seconds
+    pollIntervalRef.current = setInterval(() => {
+      fetchOrder(false);
+    }, 2000);
+
+    // Cleanup interval on unmount or when orderId changes
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
   }, [orderId]);
 
   const copyToClipboard = async (text: string) => {
@@ -328,7 +377,6 @@ export default function OrderDetailsPage() {
                   {STATUS_STEPS.map((status, index) => {
                     const isCompleted = index < currentStatusIndex;
                     const isCurrent = index === currentStatusIndex;
-                    const isPending = index > currentStatusIndex;
 
                     return (
                       <div key={status} className="relative">
