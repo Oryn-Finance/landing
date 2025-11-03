@@ -219,7 +219,7 @@ export function ConnectWalletModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 backdrop-blur-md bg-white/10 z-50 flex items-end md:items-center justify-center md:p-4"
+            className="fixed inset-0 backdrop-blur-md bg-black/40 z-50 flex items-end md:items-center justify-center md:p-4"
             onClick={onClose}
           />
 
@@ -242,10 +242,11 @@ export function ConnectWalletModal({
               opacity: 0,
             }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`bg-white shadow-xl overflow-hidden flex flex-col z-50 transition-all duration-300 ${isMobile
-              ? "fixed bottom-0 left-0 right-0 rounded-t-[24px] rounded-b-none"
-              : "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl max-w-2xl w-full h-[600px]"
-              }`}
+            className={`bg-[#070011]/95 backdrop-blur-xl border border-gray-700/40 shadow-xl overflow-hidden flex flex-col z-50 transition-all duration-300 ${
+              isMobile
+                ? "fixed bottom-0 left-0 right-0 rounded-t-[24px] rounded-b-none"
+                : "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl max-w-2xl w-full h-[600px]"
+            }`}
             onClick={(e) => e.stopPropagation()}
             style={{
               height: isMobile ? bottomSheetHeight : "600px",
@@ -254,48 +255,51 @@ export function ConnectWalletModal({
           >
             {/* Mobile drag handle */}
             <div className="md:hidden flex justify-center pt-3 pb-2 shrink-0">
-              <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+              <div className="w-12 h-1.5 bg-gray-600 rounded-full" />
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-100 shrink-0">
-              <h2 className="text-lg md:text-xl font-semibold text-gray-900">
+            <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-700/40 shrink-0">
+              <h2 className="text-lg md:text-xl font-semibold text-white">
                 Connect Wallet
               </h2>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-gray-300 hover:text-white"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="px-4 md:px-6 pt-2 md:pt-4 shrink-0 border-b border-gray-100">
+            <div className="px-4 md:px-6 pt-2 md:pt-4 shrink-0 border-b border-gray-700/40">
               <div className="flex space-x-2">
                 <button
-                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${activeTab === "evm"
-                    ? "bg-blue-50 text-blue-700 border-b-2 border-blue-500"
-                    : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
-                    }`}
+                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
+                    activeTab === "evm"
+                      ? "bg-purple-500/20 text-purple-300 border-b-2 border-purple-500"
+                      : "bg-white/5 text-gray-400 border-b-2 border-transparent hover:bg-white/10 hover:text-gray-300"
+                  }`}
                   onClick={() => setActiveTab("evm")}
                 >
                   EVM Wallets
                 </button>
                 <button
-                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${activeTab === "btc"
-                    ? "bg-orange-50 text-orange-700 border-b-2 border-orange-500"
-                    : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
-                    }`}
+                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
+                    activeTab === "btc"
+                      ? "bg-orange-500/20 text-orange-300 border-b-2 border-orange-500"
+                      : "bg-white/5 text-gray-400 border-b-2 border-transparent hover:bg-white/10 hover:text-gray-300"
+                  }`}
                   onClick={() => setActiveTab("btc")}
                 >
                   Bitcoin Wallets
                 </button>
                 <button
-                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${activeTab === "starknet"
-                    ? "bg-purple-50 text-purple-700 border-b-2 border-purple-500"
-                    : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
-                    }`}
+                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
+                    activeTab === "starknet"
+                      ? "bg-purple-50 text-purple-700 border-b-2 border-purple-500"
+                      : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
+                  }`}
                   onClick={() => setActiveTab("starknet")}
                 >
                   Starknet Wallets
@@ -318,7 +322,7 @@ export function ConnectWalletModal({
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleEVMConnect(connector)}
                           disabled={loadingEVM}
-                          className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl hover:border-purple-500/60 hover:bg-purple-500/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                             {iconUrl ? (
@@ -330,23 +334,23 @@ export function ConnectWalletModal({
                                 height={32}
                               />
                             ) : (
-                              <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded">
-                                <span className="text-lg font-bold text-gray-400">
+                              <span className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded">
+                                <span className="text-lg font-bold text-gray-300">
                                   {connector.name?.[0] || "?"}
                                 </span>
                               </span>
                             )}
                           </div>
                           <div className="flex-1 text-left min-w-0">
-                            <p className="font-medium text-gray-900 text-sm md:text-base truncate">
+                            <p className="font-medium text-white text-sm md:text-base truncate">
                               {connector.name || "Unknown Wallet"}
                             </p>
-                            <p className="text-xs md:text-sm text-gray-500 truncate">
+                            <p className="text-xs md:text-sm text-gray-400 truncate">
                               Connect your {connector.name || "Unknown Wallet"}
                             </p>
                           </div>
                           {loadingEVM && (
-                            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
                           )}
                         </motion.button>
                       );
@@ -367,7 +371,7 @@ export function ConnectWalletModal({
                             whileTap={{ scale: 0.98 }}
                             onClick={() => handleBTCConnect(wallet)}
                             disabled={loadingBTC || !wallet.available}
-                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-200 rounded-xl hover:border-orange-300 hover:bg-orange-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl hover:border-orange-500/60 hover:bg-orange-500/10 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <div className="w-10 h-10 rounded-lg flex items-center justify-center">
                               {iconUrl ? (
@@ -379,32 +383,32 @@ export function ConnectWalletModal({
                                   height={32}
                                 />
                               ) : (
-                                <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded">
-                                  <span className="text-lg font-bold text-gray-400">
+                                <span className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded">
+                                  <span className="text-lg font-bold text-gray-300">
                                     {(wallet.name || "?")[0]}
                                   </span>
                                 </span>
                               )}
                             </div>
                             <div className="flex-1 text-left min-w-0">
-                              <p className="font-medium text-gray-900 text-sm md:text-base truncate">
+                              <p className="font-medium text-white text-sm md:text-base truncate">
                                 {wallet.name || "Bitcoin Wallet"}
                               </p>
-                              <p className="text-xs md:text-sm text-gray-500 truncate">
+                              <p className="text-xs md:text-sm text-gray-400 truncate">
                                 {wallet.description ||
                                   "Connect your Bitcoin wallet"}
                               </p>
                             </div>
                             {loadingBTC && (
-                              <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
                             )}
                           </motion.button>
                         );
                       })
                     ) : (
                       <div className="col-span-2 text-center py-8">
-                        <Zap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500">
+                        <Zap className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+                        <p className="text-gray-300">
                           No Bitcoin wallets available
                         </p>
                         <p className="text-sm text-gray-400 mt-1">
