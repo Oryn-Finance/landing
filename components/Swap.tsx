@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AssetDropdown } from "./AssetDropdown";
 import { useAssetsStore } from "../store/assetsStore";
@@ -13,6 +14,7 @@ interface SwapProps {
 }
 
 const Swap: React.FC<SwapProps> = () => {
+  const router = useRouter();
   const {
     fromAsset,
     toAsset,
@@ -81,12 +83,22 @@ const Swap: React.FC<SwapProps> = () => {
     const destinationAddress = getWalletAddress(toAsset);
 
     if (!sourceAddress) {
-      setOrderError(`Please connect your ${isBitcoinChain(fromAsset.chainId, fromAsset.chainName) ? "Bitcoin" : "EVM"} wallet for the source chain`);
+      setOrderError(
+        `Please connect your ${
+          isBitcoinChain(fromAsset.chainId, fromAsset.chainName)
+            ? "Bitcoin"
+            : "EVM"
+        } wallet for the source chain`
+      );
       return;
     }
 
     if (!destinationAddress) {
-      setOrderError(`Please connect your ${isBitcoinChain(toAsset.chainId, toAsset.chainName) ? "Bitcoin" : "EVM"} wallet for the destination chain`);
+      setOrderError(
+        `Please connect your ${
+          isBitcoinChain(toAsset.chainId, toAsset.chainName) ? "Bitcoin" : "EVM"
+        } wallet for the destination chain`
+      );
       return;
     }
 
@@ -95,10 +107,18 @@ const Swap: React.FC<SwapProps> = () => {
       setOrderError(null);
       const result = await createOrder(sourceAddress, destinationAddress);
       console.log("Order created successfully:", result);
-      // You can handle success (e.g., show success message, redirect, etc.)
+
+      // Extract order_id from result and navigate to order page
+      if (result?.order_id) {
+        router.push(`/order/${result.order_id}`);
+      } else {
+        setOrderError("Order created but invalid response format");
+      }
     } catch (error) {
       console.error("Failed to create order:", error);
-      setOrderError(error instanceof Error ? error.message : "Failed to create order");
+      setOrderError(
+        error instanceof Error ? error.message : "Failed to create order"
+      );
     } finally {
       setIsCreatingOrder(false);
     }
@@ -127,7 +147,9 @@ const Swap: React.FC<SwapProps> = () => {
                     selectedAsset={fromAsset}
                     isOpen={isDropdownOpen === "from"}
                     onToggle={() =>
-                      setIsDropdownOpen(isDropdownOpen === "from" ? null : "from")
+                      setIsDropdownOpen(
+                        isDropdownOpen === "from" ? null : "from"
+                      )
                     }
                     onSelect={(asset) => handleAssetSelect(asset, "from")}
                   />
@@ -149,7 +171,11 @@ const Swap: React.FC<SwapProps> = () => {
                       if (/^0+$/.test(value) && value.length > 1) {
                         value = "0";
                       }
-                      if (value.length > 1 && value[0] === "0" && /^\d$/.test(value[1])) {
+                      if (
+                        value.length > 1 &&
+                        value[0] === "0" &&
+                        /^\d$/.test(value[1])
+                      ) {
                         value = "0";
                       }
                       const parts = value.split(".");
@@ -204,7 +230,17 @@ const Swap: React.FC<SwapProps> = () => {
                 </svg>
               </motion.button>
             </div>
-            <div className={`bg-white w-full ${!quote || !sendValue || parseFloat(sendValue) <= 0 ? 'rounded-t-[30px] rounded-b-none' : 'rounded-[30px]'} border-t border-x ${!quote || !sendValue || parseFloat(sendValue) <= 0 ? 'border-b-0' : 'border-b'} border-gray-100 p-4 md:p-6`}>
+            <div
+              className={`bg-white w-full ${
+                !quote || !sendValue || parseFloat(sendValue) <= 0
+                  ? "rounded-t-[30px] rounded-b-none"
+                  : "rounded-[30px]"
+              } border-t border-x ${
+                !quote || !sendValue || parseFloat(sendValue) <= 0
+                  ? "border-b-0"
+                  : "border-b"
+              } border-gray-100 p-4 md:p-6`}
+            >
               <label className="block text-xl md:text-2xl font-medium text-gray-700 mb-3 md:mb-4">
                 You Receive
               </label>
@@ -227,8 +263,8 @@ const Swap: React.FC<SwapProps> = () => {
                     value={
                       receiveAmount
                         ? Number(receiveAmount)
-                          .toFixed(6)
-                          .replace(/\.?0+$/, "") || "0"
+                            .toFixed(6)
+                            .replace(/\.?0+$/, "") || "0"
                         : ""
                     }
                     readOnly
@@ -266,109 +302,115 @@ const Swap: React.FC<SwapProps> = () => {
         </div>
 
         <AnimatePresence>
-          {quote && quote.result?.[0]?.feeBips !== undefined && fromAsset && sendAmount && parseFloat(sendAmount) > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0, y: 10 }}
-              animate={{ height: "auto", opacity: 1, y: 0 }}
-              exit={{ height: 0, opacity: 0, y: 10 }}
-              transition={{
-                height: { duration: 0.45, ease: [0.32, 0.72, 0, 1] },
-                opacity: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-                y: { duration: 0.45, ease: [0.32, 0.72, 0, 1] },
-              }}
-              className="w-full mb-4 overflow-hidden"
-            >
-              <div className="bg-white w-full rounded-t-[30px] border-t border-x border-gray-100 p-6">
-                <label className="block text-2xl font-medium text-gray-700 mb-3">
-                  Fees & Rate
-                </label>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <span className="text-sm text-gray-600">Fee (Bips)</span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {quote.result[0].feeBips} bips
-                    </span>
-                  </div>
-
-                  {sendAmount && parseFloat(sendAmount) > 0 && (
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                      <span className="text-sm text-gray-600">
-                        Fee ({fromAsset.asset.symbol})
-                      </span>
-                      <span className="text-sm font-medium text-gray-900">
-                        {(
-                          (parseFloat(sendAmount) * quote.result[0].feeBips) /
-                          10000
-                        ).toFixed(
-                          fromAsset.asset.decimals > 6
-                            ? 6
-                            : fromAsset.asset.decimals
-                        )}{" "}
-                        {fromAsset.asset.symbol}
-                      </span>
-                    </div>
-                  )}
-
-                  {sendValue && parseFloat(sendValue) > 0 && (
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                      <span className="text-sm text-gray-600">Fee (USD)</span>
-                      <span className="text-sm font-medium text-gray-900">
-                        $
-                        {(
-                          (parseFloat(sendValue) * quote.result[0].feeBips) /
-                          10000
-                        ).toLocaleString(undefined, {
-                          maximumFractionDigits: 2,
-                          minimumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  )}
-
-                  {sendAmount && parseFloat(sendAmount) > 0 && receiveAmount && (
-                    <div className="flex items-center justify-between py-2">
-                      <span className="text-sm text-gray-600">Rate</span>
-                      <span className="text-sm font-medium text-gray-900">
-                        1 {fromAsset.asset.symbol} ={" "}
-                        {(
-                          parseFloat(receiveAmount) / parseFloat(sendAmount)
-                        ).toFixed(6)}{" "}
-                        {toAsset?.asset.symbol || ""}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+          {quote &&
+            quote.result?.[0]?.feeBips !== undefined &&
+            fromAsset &&
+            sendAmount &&
+            parseFloat(sendAmount) > 0 && (
               <motion.div
-                initial={{ opacity: 0, scaleY: 0 }}
-                animate={{
-                  opacity: 1,
-                  scaleY: 1,
-                  transition: {
-                    duration: 0.45,
-                    ease: [0.32, 0.72, 0, 1],
-                  }
+                initial={{ height: 0, opacity: 0, y: 10 }}
+                animate={{ height: "auto", opacity: 1, y: 0 }}
+                exit={{ height: 0, opacity: 0, y: 10 }}
+                transition={{
+                  height: { duration: 0.45, ease: [0.32, 0.72, 0, 1] },
+                  opacity: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+                  y: { duration: 0.45, ease: [0.32, 0.72, 0, 1] },
                 }}
-                exit={{
-                  opacity: 0,
-                  scaleY: 0,
-                  transition: {
-                    duration: 0.45,
-                    ease: [0.32, 0.72, 0, 1],
-                  }
-                }}
-                style={{ originY: 0 }}
+                className="w-full mb-4 overflow-hidden"
               >
-                <Image
-                  src="/bottomrectangle.png"
-                  alt="bottomrectangle"
-                  className="w-full h-10 -mt-1"
-                  height={200}
-                  width={576}
-                />
+                <div className="bg-white w-full rounded-t-[30px] border-t border-x border-gray-100 p-6">
+                  <label className="block text-2xl font-medium text-gray-700 mb-3">
+                    Fees & Rate
+                  </label>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Fee (Bips)</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {quote.result[0].feeBips} bips
+                      </span>
+                    </div>
+
+                    {sendAmount && parseFloat(sendAmount) > 0 && (
+                      <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                        <span className="text-sm text-gray-600">
+                          Fee ({fromAsset.asset.symbol})
+                        </span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {(
+                            (parseFloat(sendAmount) * quote.result[0].feeBips) /
+                            10000
+                          ).toFixed(
+                            fromAsset.asset.decimals > 6
+                              ? 6
+                              : fromAsset.asset.decimals
+                          )}{" "}
+                          {fromAsset.asset.symbol}
+                        </span>
+                      </div>
+                    )}
+
+                    {sendValue && parseFloat(sendValue) > 0 && (
+                      <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                        <span className="text-sm text-gray-600">Fee (USD)</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          $
+                          {(
+                            (parseFloat(sendValue) * quote.result[0].feeBips) /
+                            10000
+                          ).toLocaleString(undefined, {
+                            maximumFractionDigits: 2,
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
+
+                    {sendAmount &&
+                      parseFloat(sendAmount) > 0 &&
+                      receiveAmount && (
+                        <div className="flex items-center justify-between py-2">
+                          <span className="text-sm text-gray-600">Rate</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            1 {fromAsset.asset.symbol} ={" "}
+                            {(
+                              parseFloat(receiveAmount) / parseFloat(sendAmount)
+                            ).toFixed(6)}{" "}
+                            {toAsset?.asset.symbol || ""}
+                          </span>
+                        </div>
+                      )}
+                  </div>
+                </div>
+                <motion.div
+                  initial={{ opacity: 0, scaleY: 0 }}
+                  animate={{
+                    opacity: 1,
+                    scaleY: 1,
+                    transition: {
+                      duration: 0.45,
+                      ease: [0.32, 0.72, 0, 1],
+                    },
+                  }}
+                  exit={{
+                    opacity: 0,
+                    scaleY: 0,
+                    transition: {
+                      duration: 0.45,
+                      ease: [0.32, 0.72, 0, 1],
+                    },
+                  }}
+                  style={{ originY: 0 }}
+                >
+                  <Image
+                    src="/bottomrectangle.png"
+                    alt="bottomrectangle"
+                    className="w-full h-10 -mt-1"
+                    height={200}
+                    width={576}
+                  />
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
+            )}
         </AnimatePresence>
       </div>
 
@@ -396,10 +438,10 @@ const Swap: React.FC<SwapProps> = () => {
           isLoading
             ? "Loading Assets..."
             : isQuoteLoading
-              ? "Getting Quote..."
-              : isCreatingOrder
-                ? "Creating Order..."
-                : "Processing..."
+            ? "Getting Quote..."
+            : isCreatingOrder
+            ? "Creating Order..."
+            : "Processing..."
         }
         confirmText="Confirm Swap"
         onConfirm={handleConfirm}

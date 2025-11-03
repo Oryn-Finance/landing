@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axios from "axios";
 import { API_URLS } from "../constants/constants";
+import type { Order } from "../types/order";
 
 export type Asset = {
   symbol: string;
@@ -67,7 +68,10 @@ interface AssetsState {
   clearError: () => void;
   setShowHero: (show: boolean) => void;
   resetSwapState: () => void;
-  createOrder: (sourceRecipient: string, destinationRecipient: string) => Promise<void>;
+  createOrder: (
+    sourceRecipient: string,
+    destinationRecipient: string
+  ) => Promise<Order>;
 }
 
 function getAssetKeyFromSymbol(symbol: string): string {
@@ -524,10 +528,19 @@ export const useAssetsStore = create<AssetsState>()(
           error: null,
         }),
 
-      createOrder: async (sourceRecipient: string, destinationRecipient: string) => {
+      createOrder: async (
+        sourceRecipient: string,
+        destinationRecipient: string
+      ) => {
         const { fromAsset, toAsset, sendAmount, quote } = get();
 
-        if (!fromAsset || !toAsset || !sendAmount || !quote || !quote.result?.[0]) {
+        if (
+          !fromAsset ||
+          !toAsset ||
+          !sendAmount ||
+          !quote ||
+          !quote.result?.[0]
+        ) {
           throw new Error("Missing required order data");
         }
 
@@ -545,11 +558,18 @@ export const useAssetsStore = create<AssetsState>()(
           ).toString();
 
           // Destination amount from quote is already in smallest units
-          const destinationAmountInSmallestUnits = quote.result[0].destination.amount;
+          const destinationAmountInSmallestUnits =
+            quote.result[0].destination.amount;
 
           // Format asset identifiers
-          const sourceAsset = buildBackendAssetValue(fromAsset.chainId, fromAsset.asset);
-          const destinationAsset = buildBackendAssetValue(toAsset.chainId, toAsset.asset);
+          const sourceAsset = buildBackendAssetValue(
+            fromAsset.chainId,
+            fromAsset.asset
+          );
+          const destinationAsset = buildBackendAssetValue(
+            toAsset.chainId,
+            toAsset.asset
+          );
 
           // Generate commitment hash
           const commitmentHash = await generateCommitmentHash({
@@ -578,19 +598,30 @@ export const useAssetsStore = create<AssetsState>()(
             : API_URLS.ORDERS;
           const url = `${baseUrl}/orders`;
 
-          const response = await axios.post(url, orderPayload, {
-            timeout: 30000,
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
+          const response = await axios.post<{ status: string; result: Order }>(
+            url,
+            orderPayload,
+            {
+              timeout: 30000,
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
 
           set({ isLoading: false });
-          return response.data;
+
+          // Handle API response format (could be direct order or wrapped in result)
+          if (response.data.status === "Ok" && response.data.result) {
+            return response.data.result;
+          }
+          // If response is the order directly
+          return response.data as unknown as Order;
         } catch (error) {
           console.error("Failed to create order:", error);
           set({
-            error: error instanceof Error ? error.message : "Failed to create order",
+            error:
+              error instanceof Error ? error.message : "Failed to create order",
             isLoading: false,
           });
           throw error;
