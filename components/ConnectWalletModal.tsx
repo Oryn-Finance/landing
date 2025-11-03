@@ -13,8 +13,10 @@ interface ConnectWalletModalProps {
   onClose: () => void;
   onEVMConnect: (connector: any) => void;
   onBTCConnect: (wallet: any) => void;
+  onStarknetConnect: (wallet: any) => void;
   loadingEVM: boolean;
   loadingBTC: boolean;
+  loadingStarknet: boolean;
 }
 
 const WALLET_ICONS: Record<string, string> = {
@@ -31,11 +33,13 @@ export function ConnectWalletModal({
   onClose,
   onEVMConnect,
   onBTCConnect,
+  onStarknetConnect,
   loadingEVM,
   loadingBTC,
+  loadingStarknet,
 }: ConnectWalletModalProps) {
   const { connectors } = useConnect();
-  const [activeTab, setActiveTab] = useState<"evm" | "btc">("evm");
+  const [activeTab, setActiveTab] = useState<"evm" | "btc" | "starknet">("evm");
 
   const handleEVMConnect = async (connector: any) => {
     try {
@@ -60,6 +64,19 @@ export function ConnectWalletModal({
   };
 
   const getBTCIcon = (walletName: string) => {
+    const name = walletName.toLowerCase();
+    return WALLET_ICONS[name];
+  };
+
+  const handleStarknetConnect = async (wallet: any) => {
+    try {
+      await onStarknetConnect(wallet);
+    } catch (error) {
+      console.error("Failed to connect Starknet wallet:", error);
+    }
+  };
+
+  const getStarknetIcon = (walletName: string) => {
     const name = walletName.toLowerCase();
     return WALLET_ICONS[name];
   };
@@ -126,6 +143,36 @@ export function ConnectWalletModal({
   };
 
   if (!open || !mounted) return null;
+
+  // Starknet wallet list
+  const starknetWallets = [
+    {
+      id: "argent-x",
+      name: "Argent X",
+      description: "Connect your Starknet wallet",
+      available:
+        typeof window !== "undefined" &&
+        typeof (window as any).starknet !== "undefined" &&
+        (window as any).starknet?.isArgentX,
+    },
+    {
+      id: "braavos",
+      name: "Braavos",
+      description: "Connect your Starknet wallet",
+      available:
+        typeof window !== "undefined" &&
+        typeof (window as any).starknet !== "undefined" &&
+        (window as any).starknet?.isBraavos,
+    },
+    {
+      id: "starknet",
+      name: "Starknet Wallet",
+      description: "Connect your Starknet wallet",
+      available:
+        typeof window !== "undefined" &&
+        typeof (window as any).starknet !== "undefined",
+    },
+  ];
 
   // Bitcoin wallet list
   const bitcoinWallets = [
@@ -247,6 +294,16 @@ export function ConnectWalletModal({
                 >
                   Bitcoin Wallets
                 </button>
+                <button
+                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
+                    activeTab === "starknet"
+                      ? "bg-purple-50 text-purple-700 border-b-2 border-purple-500"
+                      : "bg-gray-50 text-gray-600 border-b-2 border-transparent hover:bg-gray-100"
+                  }`}
+                  onClick={() => setActiveTab("starknet")}
+                >
+                  Starknet Wallets
+                </button>
               </div>
             </div>
 
@@ -362,6 +419,68 @@ export function ConnectWalletModal({
                     )}
                   </div>
                 )}
+
+                {/* Starknet Wallets - Only show when Starknet tab is active */}
+                {activeTab === "starknet" && (
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 md:gap-3">
+                    {starknetWallets && starknetWallets.length > 0 ? (
+                      starknetWallets.map((wallet: any, index: number) => {
+                        const iconUrl = getStarknetIcon(wallet.name);
+                        return (
+                          <motion.button
+                            key={wallet.id || index}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleStarknetConnect(wallet)}
+                            disabled={loadingStarknet || !wallet.available}
+                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                              {iconUrl ? (
+                                <Image
+                                  src={iconUrl}
+                                  alt={wallet.name || "Wallet"}
+                                  className="w-8 h-8"
+                                  width={32}
+                                  height={32}
+                                />
+                              ) : (
+                                <span className="w-8 h-8 flex items-center justify-center bg-purple-100 rounded">
+                                  <span className="text-lg font-bold text-purple-600">
+                                    {(wallet.name || "?")[0]}
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              <p className="font-medium text-gray-900 text-sm md:text-base truncate">
+                                {wallet.name || "Starknet Wallet"}
+                              </p>
+                              <p className="text-xs md:text-sm text-gray-500 truncate">
+                                {wallet.description ||
+                                  "Connect your Starknet wallet"}
+                              </p>
+                            </div>
+                            {loadingStarknet && (
+                              <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                            )}
+                          </motion.button>
+                        );
+                      })
+                    ) : (
+                      <div className="col-span-2 text-center py-8">
+                        <Zap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-500">
+                          No Starknet wallets available
+                        </p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Make sure you have a Starknet wallet extension
+                          installed
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -369,6 +488,8 @@ export function ConnectWalletModal({
       )}
     </AnimatePresence>
   );
+
+  if (!mounted) return null;
 
   return createPortal(modalContent, document.body);
 }

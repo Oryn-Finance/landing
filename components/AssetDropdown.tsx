@@ -2,6 +2,9 @@
 
 import { type AssetOption } from "../store/assetsStore";
 import { AssetSelectorModal } from "./AssetSelectorModal";
+import { useRef, useEffect, useState, useMemo, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAssetsStore } from "../store/assetsStore";
 import Image from "next/image";
 
 const ASSET_LOGOS: Record<string, string> = {
@@ -35,9 +38,9 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
   else if (key === "avax") url = ASSET_LOGOS.avax;
   else if (key === "strk") url = ASSET_LOGOS.strk;
   const sizeClasses = {
-    sm: "w-4 h-4",
-    md: "w-8 h-8",
-    lg: "w-10 h-10",
+    sm: "w-5 h-5 md:w-6 md:h-6",
+    md: "w-8 h-8 md:w-10 md:h-10",
+    lg: "w-10 h-10 md:w-14 md:h-14",
   };
 
   if (url) {
@@ -45,16 +48,17 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
       <Image
         src={url}
         alt={symbol}
-        className={`${sizeClasses[size]} rounded-full object-contain`}
+        className={`${sizeClasses[size]} rounded-full object-contain border border-gray-100 shadow-sm`}
         style={{ background: "#fff" }}
-        width={200}
-        height={200}
+        width={80}
+        height={80}
+        unoptimized
       />
     );
   }
   return (
     <div
-      className={`${sizeClasses[size]} bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium`}
+      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-xs font-semibold uppercase text-gray-400 border`}
     >
       {symbol.charAt(0)}
     </div>
@@ -65,7 +69,7 @@ function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
   const url = CHAIN_LOGOS[chainName];
   const sizeClasses = {
     xs: "w-4 h-4",
-    sm: "w-5 h-5",
+    sm: "w-5 h-5 md:w-6 md:h-6",
   };
 
   if (url) {
@@ -73,7 +77,7 @@ function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
       <Image
         src={url.trim()}
         alt={chainName}
-        className={`${sizeClasses[size]} rounded-full object-contain border-2 border-white`}
+        className={`${sizeClasses[size]} rounded-full object-contain border-2 border-white shadow-sm`}
         style={{ background: "#fff" }}
         width={32}
         height={32}
@@ -82,7 +86,7 @@ function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
   }
   return (
     <div
-      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-medium text-gray-500 border-2 border-white`}
+      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-semibold text-gray-500 border-2 border-white`}
     >
       {chainName.charAt(0)}
     </div>
@@ -100,7 +104,9 @@ export const AssetDropdown: React.FC<{
     <>
       <button
         onClick={onToggle}
-        className="flex items-center justify-between gap-2 px-0 py-2 bg-transparent border-0 hover:opacity-80 focus:outline-none transition-opacity cursor-pointer"
+        className={`flex items-center gap-3 transition-all duration-200 rounded-xl cursor-pointer
+          ${isOpen ? "scale-[0.98]" : "hover:scale-[1.02]"}
+        `}
       >
         <div className="flex items-center gap-2 md:gap-3 h-12 overflow-hidden">
           {selectedAsset ? (

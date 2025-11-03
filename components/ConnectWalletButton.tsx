@@ -17,11 +17,12 @@ export function ConnectWalletButton({ onOrdersClick, onWalletsClick }: ConnectWa
     const [modalOpen, setModalOpen] = useState(false);
     const [loadingEVM, setLoadingEVM] = useState(false);
     const [loadingBTC, setLoadingBTC] = useState(false);
+    const [loadingStarknet, setLoadingStarknet] = useState(false);
 
     const { address, isConnected, chainId } = useAccount();
     const { disconnect } = useDisconnect();
     const { connectors, connect } = useConnect();
-    const { evmWallet, btcWallet, setEVMWallet, setBTCWallet, disconnectEVM } = useWalletStore();
+    const { evmWallet, btcWallet, starknetWallet, setEVMWallet, setBTCWallet, setStarknetWallet, disconnectEVM } = useWalletStore();
 
     // Sync wagmi state with our store
     useEffect(() => {
@@ -101,12 +102,60 @@ export function ConnectWalletButton({ onOrdersClick, onWalletsClick }: ConnectWa
         }
     };
 
-    const isAnyWalletConnected = (isConnected && evmWallet) || btcWallet?.isConnected;
+    const handleStarknetConnect = async (wallet: any) => {
+        setLoadingStarknet(true);
+        try {
+            if (typeof window !== "undefined") {
+                if (wallet.id === "argent-x" && typeof (window as any).starknet !== "undefined") {
+                    const starknet = (window as any).starknet;
+                    if (starknet.isArgentX) {
+                        await starknet.enable();
+                        if (starknet.account && starknet.account.address) {
+                            setStarknetWallet({
+                                address: starknet.account.address,
+                                isConnected: true,
+                            });
+                            setModalOpen(false);
+                        }
+                    }
+                } else if (wallet.id === "braavos" && typeof (window as any).starknet !== "undefined") {
+                    const starknet = (window as any).starknet;
+                    if (starknet.isBraavos) {
+                        await starknet.enable();
+                        if (starknet.account && starknet.account.address) {
+                            setStarknetWallet({
+                                address: starknet.account.address,
+                                isConnected: true,
+                            });
+                            setModalOpen(false);
+                        }
+                    }
+                } else if (wallet.id === "starknet" && typeof (window as any).starknet !== "undefined") {
+                    const starknet = (window as any).starknet;
+                    await starknet.enable();
+                    if (starknet.account && starknet.account.address) {
+                        setStarknetWallet({
+                            address: starknet.account.address,
+                            isConnected: true,
+                        });
+                        setModalOpen(false);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Failed to connect Starknet wallet:", error);
+        } finally {
+            setLoadingStarknet(false);
+        }
+    };
+
+    const isAnyWalletConnected = (isConnected && evmWallet) || btcWallet?.isConnected || starknetWallet?.isConnected;
 
     const handleCloseModal = () => {
         setModalOpen(false);
         setLoadingEVM(false);
         setLoadingBTC(false);
+        setLoadingStarknet(false);
     };
 
     const formatAddress = (addr: string) => {
@@ -121,6 +170,9 @@ export function ConnectWalletButton({ onOrdersClick, onWalletsClick }: ConnectWa
         }
         if (btcWallet?.isConnected) {
             setBTCWallet({ address: "", isConnected: false });
+        }
+        if (starknetWallet?.isConnected) {
+            setStarknetWallet({ address: "", isConnected: false });
         }
     };
 
@@ -190,12 +242,31 @@ export function ConnectWalletButton({ onOrdersClick, onWalletsClick }: ConnectWa
                                     <span>{formatAddress(btcWallet.address)}</span>
                                 </motion.div>
                             )}
+
+                            {/* Starknet Wallet Badge */}
+                            {starknetWallet?.isConnected && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-purple-100 text-purple-700 rounded-lg text-xs md:text-sm font-medium"
+                                >
+                                    <Image
+                                        src="https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png"
+                                        alt="starknet"
+                                        width={20}
+                                        height={20}
+                                        className="rounded-full md:w-5 md:h-5"
+                                    />
+                                    <span className="hidden md:inline">Starknet: </span>
+                                    <span>{formatAddress(starknetWallet.address)}</span>
+                                </motion.div>
+                            )}
                         </div>
 
                         {/* Action Buttons - Desktop only */}
                         <div className="hidden md:flex items-center gap-1 md:gap-2">
-                            {/* Only show Add Wallet button if not both wallets connected */}
-                            {!(isConnected && evmWallet?.isConnected && btcWallet?.isConnected) && (
+                            {/* Only show Add Wallet button if not all wallets connected */}
+                            {!(isConnected && evmWallet?.isConnected && btcWallet?.isConnected && starknetWallet?.isConnected) && (
                                 <motion.button
                                     onClick={() => setModalOpen(true)}
                                     className="w-7 h-7 md:w-8 md:h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center transition-colors cursor-pointer"
@@ -247,8 +318,10 @@ export function ConnectWalletButton({ onOrdersClick, onWalletsClick }: ConnectWa
                 onClose={handleCloseModal}
                 onEVMConnect={handleEVMConnect}
                 onBTCConnect={handleBTCConnect}
+                onStarknetConnect={handleStarknetConnect}
                 loadingEVM={loadingEVM}
                 loadingBTC={loadingBTC}
+                loadingStarknet={loadingStarknet}
             />
         </>
     );

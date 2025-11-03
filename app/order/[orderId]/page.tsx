@@ -9,16 +9,74 @@ import { Navbar } from "../../../components/Navbar";
 import OrdersSidebar from "../../../components/OrdersSidebar";
 import PixelBlast from "@/components/ui/PixelBlast";
 import { API_URLS } from "../../../constants/constants";
-import type { Order } from "../../../types/order";
-import { Copy, CheckCircle2, Clock, Loader2 } from "lucide-react";
-import Image from "next/image";
+import type { Order, OrderStatus } from "../../../types/order";
+import {
+  ArrowLeft,
+  Copy,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  Play,
+} from "lucide-react";
+import {
+  useSignMessage,
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useSwitchChain,
+  useSendTransaction,
+} from "wagmi";
+import {
+  generateSecret,
+  prepareSignMessage,
+  storeSecret,
+  getSecret,
+  type SecretData,
+} from "../../../utils/secretManager";
+import { with0x, trim0x, getChainIdFromAsset } from "../../../utils/redeem";
+import {
+  executeRedeem,
+  getRedeemTypeFromAsset,
+} from "../../../utils/redeem/index";
+import { erc20Abi } from "viem";
+import { ExternalLink } from "lucide-react";
 
-const ASSET_LOGOS: Record<string, string> = {
-  wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
-  avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
-  bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  strk: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+// Explorer URL mapping for different chains
+const EXPLORER_URLS: Record<string, (txHash: string) => string> = {
+  arbitrum_sepolia: (txHash: string) =>
+    `https://sepolia.arbiscan.io/tx/${txHash}`,
+  avalanche_testnet: (txHash: string) =>
+    `https://testnet.snowtrace.io/tx/${txHash}`,
+  ethereum_sepolia: (txHash: string) =>
+    `https://sepolia.etherscan.io/tx/${txHash}`,
+  base_sepolia: (txHash: string) => `https://sepolia.basescan.org/tx/${txHash}`,
+};
+
+function getExplorerUrl(asset: string, txHash: string): string | null {
+  const chainName = asset.split(":")[0];
+  const explorerFn = EXPLORER_URLS[chainName];
+  if (explorerFn) {
+    return explorerFn(txHash);
+  }
+  return null;
+}
+
+const STATUS_STEPS: OrderStatus[] = [
+  "initiated",
+  "awaiting_deposit",
+  "deposit_detected",
+  "awaiting_redeem",
+  "redeeming",
+  "complete",
+];
+
+const STATUS_LABELS: Record<OrderStatus, string> = {
+  initiated: "Initiated",
+  awaiting_deposit: "Awaiting Deposit",
+  deposit_detected: "Deposit Detected",
+  awaiting_redeem: "Awaiting Redeem",
+  redeeming: "Redeeming",
+  complete: "Complete",
 };
 
 const CHAIN_LOGOS: Record<string, string> = {
@@ -136,24 +194,162 @@ export default function OrderDetailsPage() {
   const [isOrdersSidebarOpen, setIsOrdersSidebarOpen] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isOrderCompleteRef = useRef(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [isGeneratingSecret, setIsGeneratingSecret] = useState(false);
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [secretData, setSecretData] = useState<SecretData | null>(null);
+  const [redeemError, setRedeemError] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const { address, isConnected, chainId } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const { switchChain } = useSwitchChain();
+
+  // Wagmi hook for writing contract
+  const {
+    writeContract,
+    isPending: isWritingContract,
+    data: writeContractData,
+    error: writeContractError,
+  } = useWriteContract();
+
+  // Wagmi hook for payment transaction (ERC20)
+  const {
+    writeContract: writePaymentContract,
+    isPending: isWritingPayment,
+    data: paymentTxHash,
+    error: paymentTxError,
+  } = useWriteContract();
+
+  // Wagmi hook for native token payment
+  const {
+    sendTransaction: sendNativeTransaction,
+    isPending: isSendingNative,
+    data: nativeTxHash,
+    error: nativeTxError,
+  } = useSendTransaction();
+
+  // Wait for transaction receipt
+  const { data: receipt, isLoading: isWaitingForReceipt } =
+    useWaitForTransactionReceipt({
+      hash: writeContractData,
+    });
+
+  // Wait for payment transaction receipt (ERC20)
+  const { data: paymentReceipt, isLoading: isWaitingForPaymentReceipt } =
+    useWaitForTransactionReceipt({
+      hash: paymentTxHash,
+    });
+
+  // Wait for native payment transaction receipt
+  const { data: nativePaymentReceipt, isLoading: isWaitingForNativeReceipt } =
+    useWaitForTransactionReceipt({
+      hash: nativeTxHash,
+    });
+
+  const fetchOrder = async () => {
     if (!orderId) return;
 
-    const fetchOrder = async (isInitialLoad = false) => {
-      if (isOrderCompleteRef.current) {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-        return;
+    try {
+      const baseUrl = API_URLS.ORDERS.endsWith("/")
+        ? API_URLS.ORDERS.slice(0, -1)
+        : API_URLS.ORDERS;
+      const url = `${baseUrl}/orders/${orderId}`;
+
+      const response = await axios.get<
+        { status: string; result: Order } | { data: Order } | Order
+      >(url, {
+        timeout: 10000,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Handle different possible response formats
+      let orderData: Order | null = null;
+
+      // Format 1: { status: "Ok", result: Order }
+      if (
+        "status" in response.data &&
+        "result" in response.data &&
+        response.data.status === "Ok"
+      ) {
+        orderData = response.data.result;
+      }
+      // Format 2: { data: Order }
+      else if ("data" in response.data && "order_id" in response.data.data) {
+        orderData = response.data.data;
+      }
+      // Format 3: Direct Order object
+      else if ("order_id" in response.data) {
+        orderData = response.data as Order;
       }
 
-      if (isInitialLoad) {
-        setIsLoading(true);
-        setError(null);
+      if (orderData) {
+        setOrder(orderData);
+      } else {
+        setError("Order not found or invalid response format");
+      }
+    } catch (err) {
+      console.error("Failed to fetch order:", err);
+      setError("Failed to load order details");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchOrder();
+  }, [orderId]);
+
+  // Polling logic
+  useEffect(() => {
+    if (!order || !orderId) return;
+
+    // Determine if we should continue polling based on order state
+    const shouldPoll = (orderData: Order): boolean => {
+      const sourceState = orderData.source_intent.state?.toLowerCase() || "";
+      const destState = orderData.destination_intent.state?.toLowerCase() || "";
+
+      // For awaiting_deposit and deposit_detected: poll until source_intent.transactions.create_tx has a tx hash
+      // This applies when source state is "awaiting_deposit" or "deposit_detected", or when we don't have a create_tx yet
+      if (
+        sourceState === "awaiting_deposit" ||
+        sourceState === "deposit_detected" ||
+        (!sourceState &&
+          orderData.source_intent.deposit_address &&
+          !orderData.source_intent.transactions.create_tx)
+      ) {
+        return !orderData.source_intent.transactions.create_tx;
       }
 
+      // For awaiting_redeem: poll until destination_intent.transactions.create_tx has a tx hash
+      // This applies when destination state indicates we're awaiting redeem, or source has create_tx but destination doesn't
+      if (
+        destState === "awaiting_redeem" ||
+        destState === "redeeming" ||
+        (orderData.source_intent.transactions.create_tx &&
+          !orderData.destination_intent.transactions.create_tx)
+      ) {
+        return !orderData.destination_intent.transactions.create_tx;
+      }
+
+      // Stop polling for completed or other states
+      return false;
+    };
+
+    if (!shouldPoll(order)) {
+      setIsPolling(false);
+      return;
+    }
+
+    setIsPolling(true);
+
+    // Poll every 3 seconds
+    const pollInterval = setInterval(async () => {
       try {
         const baseUrl = API_URLS.ORDERS.endsWith("/")
           ? API_URLS.ORDERS.slice(0, -1)
@@ -188,47 +384,33 @@ export default function OrderDetailsPage() {
 
         if (orderData) {
           setOrder(orderData);
-          setError(null);
 
-          if (
-            orderData.source_intent.state === "completed" ||
-            orderData.destination_intent.state === "completed"
-          ) {
-            isOrderCompleteRef.current = true;
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
-            }
-          }
-        } else {
-          if (isInitialLoad) {
-            setError("Order not found or invalid response format");
+          // Check if we should stop polling
+          if (!shouldPoll(orderData)) {
+            clearInterval(pollInterval);
+            setIsPolling(false);
           }
         }
       } catch (err) {
-        console.error("Failed to fetch order:", err);
-        if (isInitialLoad) {
-          setError("Failed to load order details");
-        }
-      } finally {
-        if (isInitialLoad) {
-          setIsLoading(false);
-        }
+        console.error("Failed to poll order:", err);
+        // Continue polling on error
       }
-    };
-
-    isOrderCompleteRef.current = false;
-    fetchOrder(true);
-    pollIntervalRef.current = setInterval(() => {
-      fetchOrder(false);
-    }, 2000);
+    }, 3000); // Poll every 3 seconds
 
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
+      clearInterval(pollInterval);
+      setIsPolling(false);
     };
+  }, [order, orderId]);
+
+  // Load secret from localStorage on mount
+  useEffect(() => {
+    if (orderId) {
+      const stored = getSecret(orderId);
+      if (stored) {
+        setSecretData(stored);
+      }
+    }
   }, [orderId]);
 
   const copyToClipboard = async (text: string, fieldName: string) => {

@@ -7,6 +7,7 @@ import { X, Clock, AlertCircle, ArrowRight, RefreshCw } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useWalletStore } from "../store/walletStore";
 import Image from "next/image";
+import { API_URLS } from "@/constants/constants";
 
 interface OrdersSidebarProps {
   isOpen: boolean;
@@ -34,6 +35,8 @@ function getAssetLogo(symbol: string) {
       <Image
         src={url}
         alt={symbol}
+        width={20}
+        height={20}
         className="w-5 h-5 rounded-full object-contain"
         style={{ background: "#fff" }}
       />
@@ -44,6 +47,59 @@ function getAssetLogo(symbol: string) {
       {symbol.charAt(0)}
     </div>
   );
+}
+
+// Transform API order format to component format
+function transformOrder(apiOrder: any): any {
+  const sourceAsset = apiOrder.source_intent?.asset || "";
+  const destinationAsset = apiOrder.destination_intent?.asset || "";
+  const sourceAmount = apiOrder.source_intent?.amount || "0";
+  const destinationAmount = apiOrder.destination_intent?.amount || "0";
+
+  // Determine status from intent states
+  const sourceState = apiOrder.source_intent?.state || "Created";
+  const destState = apiOrder.destination_intent?.state || "Created";
+
+  let status = "Pending";
+  if (sourceState === "Claimed" || destState === "Claimed") {
+    status = "Completed";
+  } else if (sourceState === "Cancelled" || destState === "Cancelled") {
+    status = "Cancelled";
+  } else if (sourceState === "Created" && destState === "Created") {
+    status = "Pending";
+  }
+
+  return {
+    id: apiOrder.order_id,
+    sourceAsset,
+    destinationAsset,
+    sourceAmount:
+      typeof sourceAmount === "string" ? sourceAmount : sourceAmount.toString(),
+    destinationAmount:
+      typeof destinationAmount === "string"
+        ? destinationAmount
+        : destinationAmount.toString(),
+    status,
+    createdAt: apiOrder.created_at,
+  };
+}
+
+// Fetch orders for a user by address as /orders/user/[address]
+async function fetchUserOrders(address: string): Promise<any[]> {
+  try {
+    const response = await fetch(`${API_URLS.ORDERS}/orders/user/${address}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch");
+    }
+    const data = await response.json();
+    // Handle paginated response - extract data array
+    const orders = data.data || data;
+    // Transform API format to component format
+    return Array.isArray(orders) ? orders.map(transformOrder) : [];
+  } catch (e) {
+    // Could choose to log or pass, but let upper code handle error.
+    throw e;
+  }
 }
 
 const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
@@ -69,7 +125,7 @@ const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
   >([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch orders (placeholder - you'll need to implement actual API call)
+  // Fetch orders
   const fetchOrders = async () => {
     if (!evmAddress && !btcWallet?.address) return;
 
@@ -77,13 +133,11 @@ const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
     setError(null);
 
     try {
-      // TODO: Implement actual API call to fetch orders
-      // const userAddress = evmAddress || btcWallet.address;
-      // const fetchedOrders = await fetchUserOrders(userAddress);
-      // setOrders(fetchedOrders);
+      const userAddress = evmAddress || btcWallet?.address;
+      if (!userAddress) return;
 
-      // For now, return empty array
-      setOrders([]);
+      const fetchedOrders = await fetchUserOrders(userAddress);
+      setOrders(fetchedOrders);
     } catch (err) {
       setError("Failed to fetch orders");
       console.error("Error fetching orders:", err);
@@ -135,9 +189,41 @@ const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
     return assetValue.toUpperCase();
   };
 
-  const formatAmount = (amount: string, decimals: number = 6) => {
-    const num = parseFloat(amount) / Math.pow(10, decimals);
-    return num.toFixed(4);
+  // Get decimals for an asset based on symbol
+  const getAssetDecimals = (assetValue: string): number => {
+    const symbol = getAssetSymbol(assetValue).toLowerCase();
+    // Common token decimals
+    if (symbol === "usdc" || symbol === "usdt") return 6;
+    if (symbol === "wbtc" || symbol === "btc" || symbol === "bitcoin") return 8;
+    if (symbol === "avax" || symbol === "eth") return 18;
+    // Default to 6 for most tokens
+    return 6;
+  };
+
+  const formatAmount = (amount: string | number, assetValue: string = "") => {
+    // Handle both string and number amounts
+    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+
+    // If invalid number, return 0
+    if (isNaN(num) || num === 0) return "0.00";
+
+    // Get appropriate decimals for the asset
+    const decimals = getAssetDecimals(assetValue);
+
+    // Amounts from API are in smallest units, so divide by 10^decimals
+    const humanReadable = num / Math.pow(10, decimals);
+
+    // Format with up to 4 decimal places, but remove trailing zeros
+    // For very small amounts, use more precision
+    if (humanReadable < 0.0001) {
+      return humanReadable.toFixed(6).replace(/\.?0+$/, "");
+    }
+    if (humanReadable < 1) {
+      return humanReadable.toFixed(4).replace(/\.?0+$/, "");
+    }
+
+    // For larger amounts, show 2-4 decimal places
+    return humanReadable.toFixed(4).replace(/\.?0+$/, "") || "0";
   };
 
   return (
