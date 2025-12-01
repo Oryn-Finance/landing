@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AssetDropdown } from "./AssetDropdown";
 import { useAssetsStore } from "../store/assetsStore";
 import { useWalletStore } from "../store/walletStore";
+import { useAssetBalance } from "../hooks/useAssetBalance";
+import { Wallet } from "lucide-react";
 
 interface SwapProps {
   onOrderCreated?: (orderId: string) => void;
@@ -33,6 +35,7 @@ const Swap: React.FC<SwapProps> = () => {
   } = useAssetsStore();
 
   const { evmWallet, starknetWallet } = useWalletStore();
+  const { balance: fromBalance, isLoading: isLoadingBalance } = useAssetBalance(fromAsset);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<"from" | "to" | null>(
     null
@@ -115,24 +118,13 @@ const Swap: React.FC<SwapProps> = () => {
       console.log("Order created successfully:", result);
 
       // Extract order_id from result and navigate to order page
-      // Handle different possible response formats
       let orderId: string | null = null;
 
       if (typeof result === "object" && result !== null) {
         const resultObj = result as Record<string, unknown>;
-        // Check various possible response formats
-        if (typeof resultObj.order_id === "string") {
-          orderId = resultObj.order_id;
-        } else if (
-          resultObj.data &&
-          typeof resultObj.data === "object" &&
-          resultObj.data !== null
-        ) {
-          const data = resultObj.data as Record<string, unknown>;
-          if (typeof data.order_id === "string") {
-            orderId = data.order_id;
-          }
-        } else if (
+        
+        if (
+          resultObj.status === "Ok" &&
           resultObj.result &&
           typeof resultObj.result === "object" &&
           resultObj.result !== null
@@ -140,6 +132,19 @@ const Swap: React.FC<SwapProps> = () => {
           const resultData = resultObj.result as Record<string, unknown>;
           if (typeof resultData.order_id === "string") {
             orderId = resultData.order_id;
+          }
+        }
+        else if (typeof resultObj.order_id === "string") {
+          orderId = resultObj.order_id;
+        }
+        else if (
+          resultObj.data &&
+          typeof resultObj.data === "object" &&
+          resultObj.data !== null
+        ) {
+          const data = resultObj.data as Record<string, unknown>;
+          if (typeof data.order_id === "string") {
+            orderId = data.order_id;
           }
         }
       }
@@ -168,9 +173,28 @@ const Swap: React.FC<SwapProps> = () => {
         <div className="relative w-full">
           <div className="w-full">
             <div className="bg-white/10 mb-4 w-full rounded-[20px] border-b border-x border-gray-700/40 p-4">
-              <label className="block text-lg font-medium text-white">
-                You Pay
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-lg font-medium text-white">
+                  You Pay
+                </label>
+                {fromAsset && (
+                  <div className="flex items-center gap-1.5 text-sm text-gray-400">
+                    <Wallet className="w-3.5 h-3.5" />
+                    <span className="font-medium">
+                      {isLoadingBalance ? (
+                        <span className="inline-block w-12 h-4 bg-gray-700/50 rounded animate-pulse"></span>
+                      ) : fromBalance !== null ? (
+                        parseFloat(fromBalance).toLocaleString(undefined, {
+                          maximumFractionDigits: 6,
+                          minimumFractionDigits: 0,
+                        })
+                      ) : (
+                        "—"
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="w-full flex items-center justify-between gap-2 md:gap-3">
                 <div className="flex-shrink-0">
                   <AssetDropdown
@@ -192,6 +216,7 @@ const Swap: React.FC<SwapProps> = () => {
                     pattern="[0-9]*[.,]?[0-9]*"
                     placeholder="0.0"
                     value={sendAmount}
+                    suppressHydrationWarning
                     onChange={(e) => {
                       let value = e.target.value;
                       if (value === ".") {
@@ -299,6 +324,7 @@ const Swap: React.FC<SwapProps> = () => {
                         : ""
                     }
                     readOnly
+                    suppressHydrationWarning
                     className="text-xl md:text-2xl font-bold text-white bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
                     disabled={!toAsset}
                   />

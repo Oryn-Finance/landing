@@ -1,10 +1,7 @@
 "use client";
 
 import { type AssetOption } from "../store/assetsStore";
-import { AssetSelectorModal } from "./AssetSelectorModal";
-import { useRef, useEffect, useState, useMemo, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useAssetsStore } from "../store/assetsStore";
+import { AssetSelectorModal } from "./AssetSelectorModal"; 
 import Image from "next/image";
 
 const ASSET_LOGOS: Record<string, string> = {
@@ -13,6 +10,8 @@ const ASSET_LOGOS: Record<string, string> = {
   usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
   bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
   strk: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  zec: "https://s2.coinmarketcap.com/static/img/coins/64x64/1437.png",
+  zcash: "https://s2.coinmarketcap.com/static/img/coins/64x64/1437.png",
 };
 
 const CHAIN_LOGOS: Record<string, string> = {
@@ -20,13 +19,20 @@ const CHAIN_LOGOS: Record<string, string> = {
     "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
   "Avalanche Testnet":
     "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  "Base Sepolia":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/27716.png",
   "Bitcoin Testnet":
     "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
   "Starknet Sepolia":
     "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  "Zcash Testnet":
+    "https://s2.coinmarketcap.com/static/img/coins/64x64/1437.png",
   Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
+  Base: "https://s2.coinmarketcap.com/static/img/coins/64x64/27716.png",
   Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
   Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
+  Zcash: "https://s2.coinmarketcap.com/static/img/coins/64x64/1437.png",
+  Ethereum: "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png",
 };
 
 function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
@@ -37,6 +43,8 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
   else if (key === "wbtc") url = ASSET_LOGOS.wbtc;
   else if (key === "avax") url = ASSET_LOGOS.avax;
   else if (key === "strk") url = ASSET_LOGOS.strk;
+  else if (key === "zec" || key === "zcash") url = ASSET_LOGOS.zec;
+  else if (key === "eth" || key === "ethereum") url = ASSET_LOGOS.ethereum;
   const sizeClasses = {
     sm: "w-5 h-5 md:w-6 md:h-6",
     md: "w-8 h-8 md:w-10 md:h-10",
@@ -104,6 +112,7 @@ export const AssetDropdown: React.FC<{
     <>
       <button
         onClick={onToggle}
+        suppressHydrationWarning
         className={`flex items-center gap-3 transition-all duration-200 rounded-xl cursor-pointer
           ${isOpen ? "scale-[0.98]" : "hover:scale-[1.02]"}
         `}

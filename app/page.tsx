@@ -32,6 +32,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import ColorBends from "@/components/ui/ColorBlends";
+import Prism from "@/components/ui/Prism";
 
 // Starry background component
 function StarryBackground() {
@@ -243,9 +244,25 @@ export default function Home() {
           },
         });
 
-        setChains(response.data.result);
+        if (response.data?.result) {
+          setChains(response.data.result);
+        }
       } catch (error) {
-        console.error("Failed to fetch chains:", error);
+        // Handle network errors gracefully without showing error overlay
+        if (axios.isAxiosError(error)) {
+          if (error.code === "ECONNABORTED") {
+            console.warn("Chains API request timed out");
+          } else if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+            // Silently handle network errors - API server may not be running
+            console.warn("Chains API is not reachable. This is expected if the API server is not running.");
+          } else {
+            console.warn("Failed to fetch chains:", error.message);
+          }
+        } else {
+          console.warn("Failed to fetch chains:", error);
+        }
+        // Set empty array as fallback to prevent UI issues
+        setChains([]);
       }
     };
 
@@ -322,7 +339,7 @@ export default function Home() {
               </motion.button>
               <Link href="/swap">
                 <motion.button
-                  className="px-5 py-2 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-lg text-sm font-medium transition-all cursor-pointer shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+                  className="w-full sm:w-auto text-nowrap cursor-pointer rounded-full bg-linear-to-r from-[#C7FF6F] via-[#F9FF8D] to-[#C7FF6F] text-black font-semibold px-8 py-3 transition duration-300 hover:from-[#F9FF8D] hover:via-[#D7FF7F] hover:to-[#F9FF8D] hover:shadow-[0_0_55px_rgba(201,255,128,0.65)] shadow-[0_0_40px_rgba(201,255,128,0.45)]"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -337,23 +354,16 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-24 pb-16">
         <div className="h-screen overflow-hidden absolute w-screen opacity-50">
-          {/* <LaserFlow
-            falloffStart={2}
-            horizontalBeamOffset={0.1}
-            verticalBeamOffset={0.0}
-            color="#7A38EB"
-          /> */}
-          <ColorBends
-            colors={["#5C85FFFF", "#8a5cff", "#B700FFFF"]}
-            rotation={10}
-            speed={0.3}
-            scale={1}
-            frequency={1}
-            warpStrength={1}
-            mouseInfluence={0}
-            parallax={0.6}
-            noise={0.08}
-            transparent
+          <Prism
+            animationType="rotate"
+            timeScale={0.5}
+            height={3.5}
+            baseWidth={5.5}
+            scale={3.6}
+            hueShift={0}
+            colorFrequency={1}
+            noise={0.5}
+            glow={1}
           />
         </div>
         <div className="max-w-7xl mx-auto z-10">
