@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import { useConnect } from "wagmi";
+import { useConnect as useStarknetConnect } from "@starknet-react/core";
 import { AssetDropdown } from "./AssetDropdown";
 import { useAssetsStore } from "../store/assetsStore";
 import { useWalletStore } from "../store/walletStore";
 import { useAssetBalance } from "../hooks/useAssetBalance";
-import { Wallet } from "lucide-react";
+import { ConnectWalletModal } from "./ConnectWalletModal";
+import { useStarknetWallet } from "../hooks/useStarknetWallet";
 
 interface SwapProps {
   onOrderCreated?: (orderId: string) => void;
@@ -34,14 +38,24 @@ const Swap: React.FC<SwapProps> = () => {
     createOrder,
   } = useAssetsStore();
 
-  const { evmWallet, starknetWallet } = useWalletStore();
-  const { balance: fromBalance, isLoading: isLoadingBalance } = useAssetBalance(fromAsset);
+  const { evmWallet, starknetWallet, setEVMWallet, setStarknetWallet, disconnectEVM } = useWalletStore();
+  const { balance: fromBalance, isLoading: isLoadingFromBalance } = useAssetBalance(fromAsset);
+  const { balance: toBalance, isLoading: isLoadingToBalance } = useAssetBalance(toAsset);
+  const { connectors, connect } = useConnect();
+  const { connectors: starknetConnectors } = useStarknetConnect();
+  const { starknetConnectAsync } = useStarknetWallet();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<"from" | "to" | null>(
     null
   );
   const [orderError, setOrderError] = useState<string | null>(null);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [receiverAddress, setReceiverAddress] = useState<string>("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [loadingEVM, setLoadingEVM] = useState(false);
+  const [loadingStarknet, setLoadingStarknet] = useState(false);
+  const polygonRef = useRef<SVGSVGElement>(null);
+  const polygonImageRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
     fetchAssets();
@@ -57,20 +71,97 @@ const Swap: React.FC<SwapProps> = () => {
     setIsDropdownOpen(null);
   };
 
-  // Helper function to determine if a chain is Starknet-based
   const isStarknetChain = (chainId: string, chainName: string): boolean => {
     const identifier = `${chainId}${chainName}`.toLowerCase();
     return identifier.includes("starknet") || identifier.includes("stark");
   };
 
-  // Get wallet address for a given chain
+  const isZcash = (asset: typeof fromAsset): boolean => {
+    if (!asset) return false;
+    const symbol = asset.asset.symbol.toLowerCase();
+    const chainName = asset.chainName.toLowerCase();
+    return symbol === "zec" || symbol === "zcash" || chainName.includes("zcash");
+  };
+
   const getWalletAddress = (asset: typeof fromAsset): string | null => {
     if (!asset) return null;
+    
+    if (isZcash(asset)) {
+      return null;
+    }
+    
     const isStark = isStarknetChain(asset.chainId, asset.chainName);
     if (isStark) {
       return starknetWallet?.isConnected ? starknetWallet.address : null;
     } else {
       return evmWallet?.isConnected ? evmWallet.address : null;
+    }
+  };
+
+  const shouldShowReceiverAddress = (): boolean => {
+    if (!fromAsset || !toAsset) return false;
+    const fromIsZcash = isZcash(fromAsset);
+    const toIsZcash = isZcash(toAsset);
+    return fromIsZcash || toIsZcash;
+  };
+
+  const handleMaxClick = () => {
+    if (fromBalance && fromAsset) {
+      setSendAmount(parseFloat(fromBalance).toFixed(6));
+    }
+  };
+
+  const exceedsBalance = (): boolean => {
+    if (!fromBalance || !sendAmount || !fromAsset) return false;
+    const balance = parseFloat(fromBalance);
+    const amount = parseFloat(sendAmount);
+    return amount > balance;
+  };
+
+  const getRequiredWallet = (): "evm" | "starknet" | "zcash" | null => {
+    if (!fromAsset || !toAsset) return null;
+    
+    const fromIsZcash = isZcash(fromAsset);
+    const toIsZcash = isZcash(toAsset);
+    
+    if (fromIsZcash && toIsZcash) return null;
+    
+    if (!fromIsZcash) {
+      const isStark = isStarknetChain(fromAsset.chainId, fromAsset.chainName);
+      if (isStark && !starknetWallet?.isConnected) return "starknet";
+      if (!isStark && !evmWallet?.isConnected) return "evm";
+    }
+    
+    if (!toIsZcash) {
+      const isStark = isStarknetChain(toAsset.chainId, toAsset.chainName);
+      if (isStark && !starknetWallet?.isConnected) return "starknet";
+      if (!isStark && !evmWallet?.isConnected) return "evm";
+    }
+    
+    return null;
+  };
+
+  const handleEVMConnect = async (connector: any) => {
+    setLoadingEVM(true);
+    try {
+      connect({ connector });
+      setModalOpen(false);
+    } catch (error) {
+      console.error("Failed to connect EVM wallet:", error);
+    } finally {
+      setLoadingEVM(false);
+    }
+  };
+
+  const handleStarknetConnect = async (connector: any) => {
+    setLoadingStarknet(true);
+    try {
+      await starknetConnectAsync({ connector });
+      setModalOpen(false);
+    } catch (error) {
+      console.error("Failed to connect Starknet wallet:", error);
+    } finally {
+      setLoadingStarknet(false);
     }
   };
 
@@ -80,16 +171,31 @@ const Swap: React.FC<SwapProps> = () => {
       return;
     }
 
-    const sourceAddress = getWalletAddress(fromAsset);
-    const destinationAddress = getWalletAddress(toAsset);
+    if (exceedsBalance()) {
+      setOrderError("Insufficient balance. Amount exceeds available balance.");
+      return;
+    }
 
-    const getWalletType = (asset: typeof fromAsset): string => {
-      if (!asset) return "wallet";
-      if (isStarknetChain(asset.chainId, asset.chainName)) return "Starknet";
-      return "EVM";
-    };
+    let sourceAddress = getWalletAddress(fromAsset);
+    let destinationAddress = getWalletAddress(toAsset);
 
-    if (!sourceAddress) {
+    if (isZcash(fromAsset) && !sourceAddress) {
+      if (!receiverAddress || receiverAddress.trim() === "") {
+        setOrderError("Please enter receiver address for Zcash");
+        return;
+      }
+      sourceAddress = receiverAddress;
+    }
+
+    if (isZcash(toAsset) && !destinationAddress) {
+      if (!receiverAddress || receiverAddress.trim() === "") {
+        setOrderError("Please enter receiver address for Zcash");
+        return;
+      }
+      destinationAddress = receiverAddress;
+    }
+
+    if (!isZcash(fromAsset) && !sourceAddress) {
       setOrderError(
         `Please connect your ${
           isStarknetChain(fromAsset.chainId, fromAsset.chainName)
@@ -100,7 +206,7 @@ const Swap: React.FC<SwapProps> = () => {
       return;
     }
 
-    if (!destinationAddress) {
+    if (!isZcash(toAsset) && !destinationAddress) {
       setOrderError(
         `Please connect your ${
           isStarknetChain(toAsset.chainId, toAsset.chainName)
@@ -111,13 +217,16 @@ const Swap: React.FC<SwapProps> = () => {
       return;
     }
 
+    if (!sourceAddress || !destinationAddress) {
+      setOrderError("Missing wallet addresses");
+      return;
+    }
+
     try {
       setIsCreatingOrder(true);
       setOrderError(null);
       const result = await createOrder(sourceAddress, destinationAddress);
-      console.log("Order created successfully:", result);
 
-      // Extract order_id from result and navigate to order page
       let orderId: string | null = null;
 
       if (typeof result === "object" && result !== null) {
@@ -167,274 +276,310 @@ const Swap: React.FC<SwapProps> = () => {
     }
   };
 
+  const getConversionRate = () => {
+    if (!fromAsset || !sendAmount || parseFloat(sendAmount) <= 0 || !receiveAmount || !sendValue || !receiveValue) {
+      return null;
+    }
+    
+    const usdtRate = parseFloat(receiveValue) / parseFloat(sendAmount);
+    const usdValuePerFromAsset = parseFloat(sendValue) / parseFloat(sendAmount);
+    
+    return {
+      fromSymbol: fromAsset.asset.symbol,
+      toSymbol: toAsset?.asset.symbol || "",
+      usdtRate: usdtRate.toFixed(2),
+      usdValue: usdValuePerFromAsset.toFixed(2),
+    };
+  };
+
+  const conversionRate = getConversionRate();
+
   return (
     <div className="mx-auto max-w-xl w-full overflow-x-hidden md:overflow-x-visible origin-top">
       <div className="w-full mx-auto flex items-center flex-col rounded-3xl">
         <div className="relative w-full">
-          <div className="w-full">
-            <div className="bg-white/10 mb-4 w-full rounded-[20px] border-b border-x border-gray-700/40 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-lg font-medium text-white">
-                  You Pay
-                </label>
-                {fromAsset && (
-                  <div className="flex items-center gap-1.5 text-sm text-gray-400">
-                    <Wallet className="w-3.5 h-3.5" />
-                    <span className="font-medium">
-                      {isLoadingBalance ? (
-                        <span className="inline-block w-12 h-4 bg-gray-700/50 rounded animate-pulse"></span>
-                      ) : fromBalance !== null ? (
-                        parseFloat(fromBalance).toLocaleString(undefined, {
-                          maximumFractionDigits: 6,
-                          minimumFractionDigits: 0,
-                        })
-                      ) : (
-                        "—"
-                      )}
-                    </span>
+          <div 
+            className="w-full rounded-[24px] p-4 bg-black/35 border border-[#A1A1A1]">
+            <label className="block text-sm font-medium text-white mb-3">
+              You Give
+            </label>
+            
+            <div className="w-full flex items-center justify-between gap-3 mb-3">
+              <div className="flex-1 min-w-0">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  placeholder="0"
+                  value={sendAmount}
+                  suppressHydrationWarning
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    if (value === ".") {
+                      setSendAmount("0.");
+                      return;
+                    }
+                    value = value.replace(/[^0-9.]/g, "");
+                    if (/^0+$/.test(value) && value.length > 1) {
+                      value = "0";
+                    }
+                    if (
+                      value.length > 1 &&
+                      value[0] === "0" &&
+                      /^\d$/.test(value[1])
+                    ) {
+                      value = "0";
+                    }
+                    const parts = value.split(".");
+                    if (parts.length > 2) {
+                      value = parts[0] + "." + parts.slice(1).join("");
+                    }
+                    if (parts.length === 2 && parts[1].length > 6) {
+                      value = parts[0] + "." + parts[1].substring(0, 6);
+                    }
+                    setSendAmount(value);
+                  }}
+                  className="text-2xl md:text-3xl font-bold text-white bg-transparent focus:outline-none p-0 w-full"
+                  disabled={!fromAsset}
+                  autoComplete="off"
+                />
+              </div>
+              
+              <div className="flex-shrink-0">
+                <div 
+                  className="rounded-xl px-3 border border-white/10"
+                >
+                  <div className="[&_span]:text-white [&_svg]:text-gray-700">
+                    <AssetDropdown
+                      type="from"
+                      selectedAsset={fromAsset}
+                      isOpen={isDropdownOpen === "from"}
+                      onToggle={() =>
+                        setIsDropdownOpen(
+                          isDropdownOpen === "from" ? null : "from"
+                        )
+                      }
+                      onSelect={(asset) => handleAssetSelect(asset, "from")}
+                    />
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-[#A1A1A1] my-3"></div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-400">
+                {sendValue && (
+                  <span>
+                    ${parseFloat(sendValue).toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
                 )}
               </div>
-              <div className="w-full flex items-center justify-between gap-2 md:gap-3">
-                <div className="flex-shrink-0">
-                  <AssetDropdown
-                    type="from"
-                    selectedAsset={fromAsset}
-                    isOpen={isDropdownOpen === "from"}
-                    onToggle={() =>
-                      setIsDropdownOpen(
-                        isDropdownOpen === "from" ? null : "from"
-                      )
-                    }
-                    onSelect={(asset) => handleAssetSelect(asset, "from")}
-                  />
-                </div>
-                <div className="relative flex-1 flex flex-col items-end gap-1 min-w-0">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    pattern="[0-9]*[.,]?[0-9]*"
-                    placeholder="0.0"
-                    value={sendAmount}
-                    suppressHydrationWarning
-                    onChange={(e) => {
-                      let value = e.target.value;
-                      if (value === ".") {
-                        setSendAmount("0.");
-                        return;
-                      }
-                      value = value.replace(/[^0-9.]/g, "");
-                      if (/^0+$/.test(value) && value.length > 1) {
-                        value = "0";
-                      }
-                      if (
-                        value.length > 1 &&
-                        value[0] === "0" &&
-                        /^\d$/.test(value[1])
-                      ) {
-                        value = "0";
-                      }
-                      const parts = value.split(".");
-                      if (parts.length > 2) {
-                        value = parts[0] + "." + parts.slice(1).join("");
-                      }
-                      if (parts.length === 2 && parts[1].length > 6) {
-                        value = parts[0] + "." + parts[1].substring(0, 6);
-                      }
-                      setSendAmount(value);
-                    }}
-                    className="text-xl md:text-2xl font-bold text-white bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
-                    disabled={!fromAsset}
-                    autoComplete="off"
-                  />
-                  {sendValue && (
-                    <span className="text-sm text-gray-400 font-medium">
-                      ≈ $
-                      {parseFloat(sendValue).toLocaleString(undefined, {
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="w-full relative">
-            <div className="absolute left-1/2 transform -translate-x-1/2 -top-6 w-full flex items-center justify-center z-10 pointer-events-none">
-              <motion.button
-                whileHover={{ scale: 1, rotate: 180 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={swapAssets}
-                transition={{ duration: 0.2, ease: "linear" }}
-                disabled={!fromAsset || !toAsset}
-                className="p-2 rounded-full bg-[#e84142] cursor-pointer hover:bg-[#e84142]/90 text-white transition-colors duration-200 pointer-events-auto"
-                title="Swap assets"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-              </motion.button>
-            </div>
-            <div
-              className={`bg-white/10 w-full duration-300 ${
-                !quote || !sendValue || parseFloat(sendValue) <= 0
-                  ? "rounded-[20px]"
-                  : "rounded-[20px]"
-              } border-t border-x ${
-                !quote || !sendValue || parseFloat(sendValue) <= 0
-                  ? "border-b-0"
-                  : "border-b"
-              } border-gray-700/40 p-4`}
-            >
-              <label className="block text-lg font-medium text-white">
-                You Receive
-              </label>
-              <div className="w-full flex items-center justify-between gap-2 md:gap-3">
-                <div className="flex-shrink-0">
-                  <AssetDropdown
-                    type="to"
-                    selectedAsset={toAsset}
-                    isOpen={isDropdownOpen === "to"}
-                    onToggle={() =>
-                      setIsDropdownOpen(isDropdownOpen === "to" ? null : "to")
-                    }
-                    onSelect={(asset) => handleAssetSelect(asset, "to")}
-                  />
-                </div>
-                <div className="relative flex-1 flex flex-col items-end gap-1 min-w-0">
-                  <input
-                    type="decimal"
-                    placeholder="0.0"
-                    value={
-                      receiveAmount
-                        ? Number(receiveAmount)
-                            .toFixed(6)
-                            .replace(/\.?0+$/, "") || "0"
-                        : ""
-                    }
-                    readOnly
-                    suppressHydrationWarning
-                    className="text-xl md:text-2xl font-bold text-white bg-transparent focus:outline-none p-0 w-full min-w-[60px] text-right"
-                    disabled={!toAsset}
-                  />
-                  {receiveValue && (
-                    <span className="text-sm text-gray-400 font-medium">
-                      ≈ $
-                      {parseFloat(receiveValue).toLocaleString(undefined, {
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  )}
-                  {isQuoteLoading && (
-                    <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  )}
-                </div>
+              <div className="flex items-center gap-2">
+                {fromAsset && (
+                  <span className="text-sm text-gray-400">
+                    {isLoadingFromBalance ? (
+                      <span className="inline-block w-16 h-4 bg-gray-700/50 rounded animate-pulse"></span>
+                    ) : fromBalance !== null ? (
+                      `${parseFloat(fromBalance).toLocaleString(undefined, {
+                        maximumFractionDigits: 6,
+                        minimumFractionDigits: 0,
+                      })} ${fromAsset.asset.symbol}`
+                    ) : (
+                      ""
+                    )}
+                  </span>
+                )}
+                {fromBalance && fromAsset && (
+                  <span className="text-sm text-[#A2DF35] cursor-pointer" onClick={handleMaxClick}>
+                    MAX
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        <AnimatePresence>
-          {quote &&
-            quote.result?.[0]?.feeBips !== undefined &&
-            fromAsset &&
-            sendAmount &&
-            parseFloat(sendAmount) > 0 && (
-              <motion.div
-                initial={{ height: 0, opacity: 0, y: 10, marginTop: 0 }}
-                animate={{ height: 248, opacity: 1, y: 0, marginTop: 16 }}
-                exit={{
-                  height: 0,
-                  opacity: 0,
-                  y: 10,
-                  marginTop: 0,
-                  transition: { duration: 0.3, ease: "easeOut" },
-                }}
-                transition={{
-                  type: "spring",
-                  stiffness: 200,
-                  damping: 25,
-                }}
-                className="w-full overflow-hidden"
-              >
-                <div className="bg-white/10 w-full rounded-[20px] border-t border-x border-gray-700/40 p-6">
-                  <label className="block text-lg font-medium text-white mb-3">
-                    Fees & Rate
-                  </label>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between py-2 border-b border-gray-700/40">
-                      <span className="text-sm text-gray-300">Fee (Bips)</span>
-                      <span className="text-sm font-medium text-white">
-                        {quote.result[0].feeBips} bips
-                      </span>
-                    </div>
+        <div className="relative w-full flex items-center justify-center -my-5 z-10">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={swapAssets}
+            transition={{ duration: 0.2 }}
+            disabled={!fromAsset || !toAsset}
+            className="relative w-12 h-12 flex items-center justify-center pointer-events-auto cursor-pointer disabled:brightness-50 disabled:cursor-not-allowed"
+            title="Swap assets"
+            // style={{
+            //   boxShadow: "0 0 40px rgba(201, 255, 128, 0.45)",
+            // }}
+            onMouseEnter={(e) => {
+              const svg = polygonRef.current;
+              if (svg) {
+                const stop1 = svg.querySelector('#paint0_linear_10_164 stop:first-child') as SVGStopElement;
+                const stop2 = svg.querySelector('#paint0_linear_10_164 stop:last-child') as SVGStopElement;
+                if (stop1) stop1.setAttribute('stop-color', '#E6EF63');
+                if (stop2) stop2.setAttribute('stop-color', '#96DD2C');
+              }
+              // e.currentTarget.style.boxShadow = "0 0 55px rgba(201, 255, 128, 0.65)";
+            }}
+            onMouseLeave={(e) => {
+              const svg = polygonRef.current;
+              if (svg) {
+                const stop1 = svg.querySelector('#paint0_linear_10_164 stop:first-child') as SVGStopElement;
+                const stop2 = svg.querySelector('#paint0_linear_10_164 stop:last-child') as SVGStopElement;
+                if (stop1) stop1.setAttribute('stop-color', '#96DD2C');
+                if (stop2) stop2.setAttribute('stop-color', '#E6EF63');
+              }
+              // e.currentTarget.style.boxShadow = "0 0 40px rgba(201, 255, 128, 0.45)";
+            }}
+          >
+            <Image src="/polygon.svg" alt="Swap" width={42} height={46} className="absolute inset-0 w-full h-full" unoptimized />
+            <Image src="/arrows.svg" alt="Swap" width={24} height={24} className="relative z-10" unoptimized />
+          </motion.button>
+        </div>
 
-                    {sendAmount && parseFloat(sendAmount) > 0 && (
-                      <div className="flex items-center justify-between py-2 border-b border-gray-700/40">
-                        <span className="text-sm text-gray-300">
-                          Fee ({fromAsset.asset.symbol})
-                        </span>
-                        <span className="text-sm font-medium text-white">
-                          {(
-                            (parseFloat(sendAmount) * quote.result[0].feeBips) /
-                            10000
-                          ).toFixed(
-                            fromAsset.asset.decimals > 6
-                              ? 6
-                              : fromAsset.asset.decimals
-                          )}{" "}
-                          {fromAsset.asset.symbol}
-                        </span>
-                      </div>
-                    )}
-
-                    {sendValue && parseFloat(sendValue) > 0 && (
-                      <div className="flex items-center justify-between py-2 border-b border-gray-700/40">
-                        <span className="text-sm text-gray-300">Fee (USD)</span>
-                        <span className="text-sm font-medium text-white">
-                          $
-                          {(
-                            (parseFloat(sendValue) * quote.result[0].feeBips) /
-                            10000
-                          ).toLocaleString(undefined, {
-                            maximumFractionDigits: 2,
-                            minimumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                    )}
-
-                    {sendAmount &&
-                      parseFloat(sendAmount) > 0 &&
-                      receiveAmount && (
-                        <div className="flex items-center justify-between py-2">
-                          <span className="text-sm text-gray-300">Rate</span>
-                          <span className="text-sm font-medium text-white">
-                            1 {fromAsset.asset.symbol} ={" "}
-                            {(
-                              parseFloat(receiveAmount) / parseFloat(sendAmount)
-                            ).toFixed(6)}{" "}
-                            {toAsset?.asset.symbol || ""}
-                          </span>
-                        </div>
-                      )}
+        <div className="relative w-full">
+          <div 
+            className="w-full rounded-[24px] p-4 bg-[#161F00]/35 border border-[#A1A1A1]">
+            <label className="block text-sm font-medium text-white mb-3">
+              You Get
+            </label>
+            
+            <div className="w-full flex items-center justify-between gap-3 mb-3">
+              <div className="flex-1 min-w-0">
+                <input
+                  type="text"
+                  placeholder="0"
+                  value={
+                    receiveAmount
+                      ? Number(receiveAmount)
+                          .toFixed(6)
+                          .replace(/\.?0+$/, "") || "0"
+                      : ""
+                  }
+                  readOnly
+                  suppressHydrationWarning
+                  className="text-2xl md:text-3xl font-bold text-white bg-transparent focus:outline-none p-0 w-full"
+                  disabled={!toAsset}
+                />
+              </div>
+              
+              <div className="flex-shrink-0">
+                <div 
+                  className="rounded-xl px-3 border border-white/10"
+                >
+                  <div className="[&_span]:text-white [&_svg]:text-gray-700">
+                    <AssetDropdown
+                      type="to"
+                      selectedAsset={toAsset}
+                      isOpen={isDropdownOpen === "to"}
+                      onToggle={() =>
+                        setIsDropdownOpen(isDropdownOpen === "to" ? null : "to")
+                      }
+                      onSelect={(asset) => handleAssetSelect(asset, "to")}
+                    />
                   </div>
                 </div>
-              </motion.div>
+              </div>
+            </div>
+
+            <div className="border-t border-[#A1A1A1] my-3"></div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-400">
+                {receiveValue && (
+                  <span>
+                    ${parseFloat(receiveValue).toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                )}
+              </div>
+              <div className="text-sm text-gray-400">
+                {toAsset && (
+                  <span>
+                    {isLoadingToBalance ? (
+                      <span className="inline-block w-16 h-4 bg-gray-700/50 rounded animate-pulse"></span>
+                    ) : toBalance !== null ? (
+                      `${parseFloat(toBalance).toLocaleString(undefined, {
+                        maximumFractionDigits: 6,
+                        minimumFractionDigits: 0,
+                      })} ${toAsset.asset.symbol}`
+                    ) : (
+                      ""
+                    )}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {conversionRate && fromAsset && (
+          <div className="w-full flex items-center justify-between text-sm text-gray-400 px-2 pt-4">
+            <span>
+              1 {conversionRate.fromSymbol} = {conversionRate.usdtRate} USDT (${conversionRate.usdValue})
+            </span>
+            {quote && quote.result?.[0]?.feeBips !== undefined && sendValue && (
+              <div className="flex items-center gap-1">
+                <Image src="/gas.svg" alt="Fee" width={16} height={16} className="w-4 h-4" unoptimized />
+                <span>
+                  ${(
+                    (parseFloat(sendValue) * (quote.result[0].feeBips || 0)) /
+                    10000
+                  ).toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
             )}
+          </div>
+        )}
+
+        <AnimatePresence>
+          {shouldShowReceiverAddress() && (
+            <motion.div
+              initial={{ height: 0, opacity: 0, y: 10, marginTop: 0 }}
+              animate={{ height: "auto", opacity: 1, y: 0, marginTop: 16 }}
+              exit={{
+                height: 0,
+                opacity: 0,
+                y: 10,
+                marginTop: 0,
+                transition: { duration: 0.3, ease: "easeOut" },
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 200,
+                damping: 25,
+              }}
+              className="w-full overflow-hidden"
+            >
+              <div 
+                className="w-full rounded-[24px] p-4 bg-black/35 border border-[#A1A1A1]"
+              >
+                <label className="block text-sm font-medium text-white mb-3">
+                  Receiver Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter Zcash address"
+                  value={
+                    receiverAddress
+                      ? receiverAddress
+                      : ""
+                  }
+                  suppressHydrationWarning
+                  onChange={(e) => setReceiverAddress(e.target.value)}
+                  className="text-lg md:text-xl font-bold text-white bg-transparent focus:outline-none p-0 w-full"
+                />
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
       {orderError && (
@@ -443,57 +588,126 @@ const Swap: React.FC<SwapProps> = () => {
         </div>
       )}
 
-      <button
-        onClick={handleConfirm}
-        disabled={
-          !fromAsset ||
-          !toAsset ||
-          !sendAmount ||
-          parseFloat(sendAmount) <= 0 ||
-          !quote ||
-          !quote.result?.[0] ||
-          !receiveAmount ||
-          receiveAmount.trim() === "" ||
-          isLoading ||
-          isQuoteLoading ||
-          isCreatingOrder ||
-          !getWalletAddress(fromAsset) ||
-          !getWalletAddress(toAsset)
-        }
-        className={`w-full mt-4 py-4 px-6 rounded-full font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
-          isLoading || isQuoteLoading || isCreatingOrder
-            ? "bg-purple-600/50 text-white cursor-wait"
-            : !fromAsset ||
-              !toAsset ||
-              !sendAmount ||
-              parseFloat(sendAmount) <= 0 ||
-              !quote ||
-              !quote.result?.[0] ||
-              !receiveAmount ||
-              receiveAmount.trim() === "" ||
-              !getWalletAddress(fromAsset) ||
-              !getWalletAddress(toAsset)
-            ? "bg-gray-700/50 text-gray-500 cursor-not-allowed"
-            : "bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 cursor-pointer active:scale-95"
-        }`}
-      >
-        {isLoading || isQuoteLoading || isCreatingOrder ? (
-          <>
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            <span>
-              {isLoading
-                ? "Loading Assets..."
-                : isQuoteLoading
-                ? "Getting Quote..."
-                : isCreatingOrder
-                ? "Creating Order..."
-                : "Processing..."}
-            </span>
-          </>
-        ) : (
-          "Confirm Swap"
-        )}
-      </button>
+      <div className="w-full mt-4">
+        {(() => {
+          const requiredWallet = getRequiredWallet();
+          const balanceExceeded = exceedsBalance();
+          const isDisabled = 
+            !fromAsset ||
+            !toAsset ||
+            !sendAmount ||
+            parseFloat(sendAmount) <= 0 ||
+            !quote ||
+            !quote.result?.[0] ||
+            !receiveAmount ||
+            receiveAmount.trim() === "" ||
+            isLoading ||
+            isQuoteLoading ||
+            isCreatingOrder ||
+            balanceExceeded ||
+            (isZcash(fromAsset) && !receiverAddress.trim() && !getWalletAddress(fromAsset)) ||
+            (isZcash(toAsset) && !receiverAddress.trim() && !getWalletAddress(toAsset)) ||
+            (!isZcash(fromAsset) && !getWalletAddress(fromAsset)) ||
+            (!isZcash(toAsset) && !getWalletAddress(toAsset));
+
+          let buttonText = "Swap";
+          if (isLoading) buttonText = "Loading Assets...";
+          else if (isQuoteLoading) buttonText = "Getting Quote...";
+          else if (isCreatingOrder) buttonText = "Creating Order...";
+          else if (requiredWallet && requiredWallet !== "zcash") buttonText = "Connect Wallet";
+          else if (balanceExceeded) buttonText = "Insufficient Balance";
+
+          let buttonClassName = "w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ";
+          if (isLoading || isQuoteLoading || isCreatingOrder) {
+            buttonClassName += "bg-[#A2DF35]/50 text-white cursor-wait";
+          } else if (requiredWallet && requiredWallet !== "zcash") {
+            buttonClassName += "text-black cursor-pointer active:scale-95";
+          } else if (balanceExceeded || isDisabled) {
+            buttonClassName += "bg-gray-700/50 text-gray-500 cursor-not-allowed";
+          } else {
+            buttonClassName += "text-black cursor-pointer active:scale-95";
+          }
+
+          const isConnectWallet = requiredWallet && requiredWallet !== "zcash";
+          const canShowGradient = 
+            !isLoading &&
+            !isQuoteLoading &&
+            !isCreatingOrder &&
+            !balanceExceeded &&
+            (isConnectWallet || (
+              !isDisabled &&
+              fromAsset &&
+              toAsset &&
+              sendAmount &&
+              parseFloat(sendAmount) > 0 &&
+              quote &&
+              quote.result?.[0] &&
+              receiveAmount &&
+              receiveAmount.trim() !== ""
+            ));
+
+          const buttonStyle = canShowGradient
+            ? {
+                background: "linear-gradient(to right, #96DD2C, #E6EF63)",
+                boxShadow: "0 0 40px rgba(201, 255, 128, 0.45)",
+              }
+            : undefined;
+
+          const handleClick = () => {
+            if (requiredWallet && requiredWallet !== "zcash") {
+              setModalOpen(true);
+            } else if (!isDisabled && !balanceExceeded) {
+              handleConfirm();
+            }
+          };
+
+          return (
+            <div className="w-full">
+              <button
+                onClick={handleClick}
+                disabled={requiredWallet && requiredWallet !== "zcash" ? false : (isDisabled || balanceExceeded)}
+                className={buttonClassName}
+                style={buttonStyle}
+                onMouseEnter={(e) => {
+                  if (canShowGradient) {
+                    e.currentTarget.style.background = "linear-gradient(to right, #E6EF63, #96DD2C)";
+                    e.currentTarget.style.boxShadow = "0 0 55px rgba(201, 255, 128, 0.65)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (canShowGradient) {
+                    e.currentTarget.style.background = "linear-gradient(to right, #96DD2C, #E6EF63)";
+                    e.currentTarget.style.boxShadow = "0 0 40px rgba(201, 255, 128, 0.45)";
+                  }
+                }}
+              >
+                {isLoading || isQuoteLoading || isCreatingOrder ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-xl animate-spin"></div>
+                    <span>{buttonText}</span>
+                  </>
+                ) : (
+                  buttonText
+                )}
+              </button>
+              {balanceExceeded && (
+                <p className="text-sm text-red-400 mt-2 text-center">
+                  Amount exceeds available balance
+                </p>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
+      <ConnectWalletModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onEVMConnect={handleEVMConnect}
+        onStarknetConnect={handleStarknetConnect}
+        loadingEVM={loadingEVM}
+        loadingStarknet={loadingStarknet}
+      />
     </div>
   );
 };

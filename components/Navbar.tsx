@@ -20,12 +20,9 @@ export function Navbar({ onOrdersClick }: NavbarProps = {}) {
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
-        className="fixed top-4 left-1/2 -translate-x-1/2 w-[95%] max-w-7xl z-50"
+        className="fixed z-50 w-full mx-auto"
       >
-        <div className="relative bg-gray-900/80 backdrop-blur-xl border border-gray-700/50 rounded-2xl px-4 sm:px-6 lg:px-8">
-          {/* Purple glow effect in background */}
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-purple-500/10 via-purple-500/5 to-transparent pointer-events-none" />
-
+        <div className="relative bg-[#000000]/35 px-6 sm:px-8 lg:px-16 py-2 sm:py-3 lg:py-4 border-b border-[#A1A1A1]">
           <div className="relative flex justify-between items-center h-14 md:h-16">
             {/* Brand/Logo - Left */}
             <Link href="/">
@@ -45,26 +42,32 @@ export function Navbar({ onOrdersClick }: NavbarProps = {}) {
                   alt="Oryn"
                   width={100}
                   height={32}
-                  className="h-5 md:h-6 w-auto"
+                  className="h-7 md:h-8 w-auto"
                 />
               </motion.div>
             </Link>
 
             {/* Navigation Links - Center */}
-            <div className="hidden lg:flex items-center gap-6 xl:gap-8">
+            <div className="hidden lg:flex items-center gap-8 lg:gap-10">
               <Link href="/swap">
                 <motion.button
-                  className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
+                  className="text-lg font-medium text-white transition-colors cursor-pointer"
                   whileHover={{ scale: 1.05 }}
                 >
                   Swap
                 </motion.button>
               </Link>
+              <Link href="/faucet">
+                <motion.button
+                  className="text-lg font-medium text-white transition-colors cursor-pointer"
+                  whileHover={{ scale: 1.05 }}
+                >
+                  Faucet
+                </motion.button>
+              </Link>
             </div>
 
-            {/* Action Buttons - Right */}
             <div className="flex items-center gap-3">
-              {/* Log in / View Orders Button */}
               <motion.button
                 onClick={onOrdersClick}
                 className="px-4 py-2 bg-gray-800/80 hover:bg-gray-800 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
@@ -75,7 +78,6 @@ export function Navbar({ onOrdersClick }: NavbarProps = {}) {
                 <span className="sm:hidden">Orders</span>
               </motion.button>
 
-              {/* Connect Wallet / Sign Up Button */}
               <ConnectWalletButton
                 onOrdersClick={onOrdersClick}
                 onWalletsClick={() => setWalletSidebarOpen(true)}

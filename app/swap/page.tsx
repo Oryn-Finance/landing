@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import Swap from "../../components/Swap";
 import { Navbar } from "../../components/Navbar";
 import OrdersSidebar from "../../components/OrdersSidebar";
-import PixelBlast from "@/components/ui/PixelBlast";
+import Prism from "../../components/ui/Prism";
 
 export default function SwapPage() {
   const router = useRouter();
@@ -24,33 +24,26 @@ export default function SwapPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070011] text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#070011] text-white overflow-x-hidden overflow-y-visible">
       {/* Navigation */}
       <Navbar onOrdersClick={handleOrdersClick} />
 
       <div className="w-screen h-screen absolute inset-0">
-        <PixelBlast
-          variant="square"
-          pixelSize={4}
-          color="#B19EEF"
-          patternScale={2}
-          patternDensity={1}
-          pixelSizeJitter={0}
-          enableRipples
-          rippleSpeed={0.5}
-          rippleThickness={0.12}
-          rippleIntensityScale={1.5}
-          // liquid
-          // liquidStrength={0.12}
-          // liquidRadius={1.2}
-          // liquidWobbleSpeed={5}
-          speed={0.6}
-          edgeFade={0.25}
-        />
+      <Prism
+        animationType="rotate"
+        timeScale={0.5}
+        height={3.5}
+        baseWidth={5.5}
+        scale={3.6}
+        hueShift={0}
+        colorFrequency={1}
+        noise={0.5}
+        glow={1}
+      />
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center ">
+      <div className="relative z-10 min-h-screen flex items-center justify-center overflow-visible">
         <motion.div
           initial={{ opacity: 0, y: 30, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -61,11 +54,9 @@ export default function SwapPage() {
             damping: 20,
             stiffness: 250,
           }}
-          className="w-fit max-w-2xl"
+          className="w-fit max-w-2xl overflow-visible"
         >
-          <div className="rounded-4xl bg-white/10 backdrop-blur-lg border border-white/10 p-4">
             <Swap />
-          </div>
         </motion.div>
       </div>
 

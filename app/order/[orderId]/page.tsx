@@ -9,10 +9,10 @@ import axios from "axios";
 import QRCodeSVG from "react-qr-code";
 import { Navbar } from "../../../components/Navbar";
 import OrdersSidebar from "../../../components/OrdersSidebar";
-import PixelBlast from "@/components/ui/PixelBlast";
+import Prism from "@/components/ui/Prism";
 import { API_URLS } from "../../../constants/constants";
 import type { Order, OrderStatus } from "../../../types/order";
-import { Copy, CheckCircle2, Clock, Loader2, ArrowLeft } from "lucide-react";
+import { CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
 import {
   useSignMessage,
   useAccount,
@@ -30,7 +30,6 @@ import {
 } from "../../../utils/redeem/index";
 import { erc20Abi, type WalletClient } from "viem";
 import { useAssetsStore } from "@/store/assetsStore";
-import { ExternalLink } from "lucide-react";
 import Image from "next/image";
 
 const ASSET_LOGOS: Record<string, string> = {
@@ -101,11 +100,13 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
   else if (key === "wbtc") url = ASSET_LOGOS.wbtc;
   else if (key === "avax") url = ASSET_LOGOS.avax;
   else if (key === "strk") url = ASSET_LOGOS.strk;
+  else if (key === "zcash" || key === "zec") url = "https://s2.coinmarketcap.com/static/img/coins/64x64/1437.png";
+  else if (key === "eth") url = "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png";
 
   const sizeClasses = {
-    sm: "w-4 h-4",
-    md: "w-8 h-8",
-    lg: "w-10 h-10",
+    sm: "w-5 h-5 md:w-6 md:h-6",
+    md: "w-8 h-8 md:w-10 md:h-10",
+    lg: "w-10 h-10 md:w-14 md:h-14",
   };
 
   if (url) {
@@ -113,16 +114,17 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
       <Image
         src={url.trim()}
         alt={symbol}
-        className={`${sizeClasses[size]} rounded-full object-contain`}
+        className={`${sizeClasses[size]} rounded-full object-contain border border-gray-100 shadow-sm`}
         style={{ background: "#fff" }}
-        width={200}
-        height={200}
+        width={80}
+        height={80}
+        unoptimized
       />
     );
   }
   return (
     <div
-      className={`${sizeClasses[size]} bg-gray-700 rounded-full flex items-center justify-center text-xs font-medium text-gray-300`}
+      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-xs font-semibold uppercase text-gray-400 border`}
     >
       {symbol.charAt(0)}
     </div>
@@ -133,7 +135,7 @@ function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
   const url = CHAIN_LOGOS[chainName];
   const sizeClasses = {
     xs: "w-4 h-4",
-    sm: "w-5 h-5",
+    sm: "w-5 h-5 md:w-6 md:h-6",
   };
 
   if (url) {
@@ -141,16 +143,17 @@ function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
       <Image
         src={url.trim()}
         alt={chainName}
-        className={`${sizeClasses[size]} rounded-full object-contain border-2 border-gray-700`}
+        className={`${sizeClasses[size]} rounded-full object-contain border-2 border-white shadow-sm`}
         style={{ background: "#fff" }}
         width={32}
         height={32}
+        unoptimized
       />
     );
   }
   return (
     <div
-      className={`${sizeClasses[size]} bg-gray-700 rounded-full flex items-center justify-center text-[10px] font-medium text-gray-300 border-2 border-gray-600`}
+      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-semibold text-gray-500 border-2 border-white`}
     >
       {chainName.charAt(0)}
     </div>
@@ -199,7 +202,10 @@ function formatAmount(amount: string, assetString?: string): string {
     return whole.toString();
   }
   const decimalStr = remainder.toString().padStart(decimals, "0");
-  const trimmed = decimalStr.replace(/0+$/, "");
+  let trimmed = decimalStr.replace(/0+$/, "");
+  if (trimmed.length > 4) {
+    trimmed = trimmed.substring(0, 4) + "...";
+  }
   return `${whole}.${trimmed}`;
 }
 
@@ -345,7 +351,6 @@ export default function OrderDetailsPage() {
       const sourceState = orderData.source_intent.state?.toLowerCase() || "";
       const destState = orderData.destination_intent.state?.toLowerCase() || "";
 
-      // Stop polling if states indicate completion
       if (
         sourceState === "completed" ||
         destState === "completed" ||
@@ -354,22 +359,16 @@ export default function OrderDetailsPage() {
         return false;
       }
 
-      // For awaiting_deposit and deposit_detected: poll until source_intent.transactions.create_tx has a tx hash
-      // This applies when source state is "awaiting_deposit" or "deposit_detected", or when we don't have a create_tx yet
       if (
         sourceState === "awaiting_deposit" ||
         sourceState === "deposit_detected" ||
         (!sourceState &&
-          orderData.source_intent.deposit_address &&
+          orderData.source_intent.swap_id &&
           !orderData.source_intent.transactions.create_tx)
       ) {
         return !orderData.source_intent.transactions.create_tx;
       }
 
-      // For awaiting_redeem/redeeming: poll until claim_tx appears
-      // This applies when:
-      // 1. Destination state indicates we're awaiting redeem or redeeming
-      // 2. Source has create_tx (deposit detected) but we don't have claim_tx yet
       const hasDeposit =
         orderData.source_intent.transactions.create_tx ||
         orderData.destination_intent.transactions.create_tx;
@@ -532,7 +531,7 @@ export default function OrderDetailsPage() {
         // Execute EVM redeem (network switching is handled inside executeRedeem)
         const result = await executeRedeem({
           asset: destinationAsset,
-          escrowAddress: order.destination_intent.escrow_address,
+          escrowAddress: order.destination_intent.registry_address,
           swapId: order.destination_intent.swap_id,
           secret: secretData.secret,
           chainId: requiredChainId,
@@ -556,10 +555,10 @@ export default function OrderDetailsPage() {
         // Execute Bitcoin redeem (async)
         const result = await executeRedeem({
           asset: destinationAsset,
-          escrowAddress: order.destination_intent.escrow_address,
+          escrowAddress: order.destination_intent.registry_address,
           swapId: order.destination_intent.swap_id,
           secret: secretData.secret,
-          htlcAddress: order.destination_intent.deposit_address,
+          htlcAddress: order.destination_intent.swap_id,
           recipientAddress: order.destination_intent.recipient,
           wallet: walletClient as unknown as WalletClient,
         });
@@ -581,7 +580,7 @@ export default function OrderDetailsPage() {
         // Execute Starknet redeem (async)
         const result = await executeRedeem({
           asset: destinationAsset,
-          escrowAddress: order.destination_intent.escrow_address,
+          escrowAddress: order.destination_intent.registry_address,
           swapId: order.destination_intent.swap_id,
           secret: secretData.secret,
           wallet: walletClient as unknown as WalletClient,
@@ -773,7 +772,7 @@ export default function OrderDetailsPage() {
     }
 
     const tokenAddress = order.source_intent.token_address;
-    const depositAddress = order.source_intent.deposit_address;
+    const depositAddress = order.source_intent.swap_id;
     const amount = order.source_intent.amount;
     const sourceAsset = order.source_intent.asset;
     const requiredChainId = getChainIdFromAsset(sourceAsset);
@@ -871,9 +870,9 @@ export default function OrderDetailsPage() {
   useEffect(() => {
     setIsPaying(
       isWritingPayment ||
-        isSendingNative ||
-        isWaitingForPaymentReceipt ||
-        isWaitingForNativeReceipt
+      isSendingNative ||
+      isWaitingForPaymentReceipt ||
+      isWaitingForNativeReceipt
     );
   }, [
     isWritingPayment,
@@ -903,19 +902,19 @@ export default function OrderDetailsPage() {
   // Check if deposit is detected (has create_tx)
   const isDepositDetected = Boolean(
     order?.source_intent.transactions.create_tx ||
-      order?.destination_intent.transactions.create_tx
+    order?.destination_intent.transactions.create_tx
   );
 
   // Check if redeemed (has claim_tx) - this means the swap was successfully completed
   const isRedeemed = Boolean(
     order?.source_intent.transactions.claim_tx ||
-      order?.destination_intent.transactions.claim_tx
+    order?.destination_intent.transactions.claim_tx
   );
 
   // Check if refunded (has cancel_tx) - this means the swap was cancelled/refunded
   const isRefunded = Boolean(
     order?.source_intent.transactions.cancel_tx ||
-      order?.destination_intent.transactions.cancel_tx
+    order?.destination_intent.transactions.cancel_tx
   );
 
   // Check if completed/claimed - if redeemed (has claim_tx), it's always completed
@@ -939,7 +938,39 @@ export default function OrderDetailsPage() {
     ? getAssetInfo(order.destination_intent.asset)
     : null;
 
-  const sourceDepositAddress = order?.source_intent.deposit_address || "";
+  const sourceDepositAddress = order?.source_intent.swap_id || "";
+  console.log(sourceDepositAddress);
+
+  // Helper to find AssetOption from asset string
+  const findAssetOption = (assetString: string) => {
+    const { assets } = useAssetsStore.getState();
+    const parts = assetString.split(":");
+    if (parts.length < 2) return null;
+
+    const chainId = parts[0].replace(/_/g, " ");
+    const symbol = parts[1].toLowerCase();
+
+    return assets.find(
+      (opt) =>
+        opt.chainId.toLowerCase().replace(/_/g, " ") === chainId.toLowerCase() &&
+        opt.asset.symbol.toLowerCase() === symbol
+    ) || null;
+  };
+
+  // Get asset options for display
+  const sourceAssetOption = order ? findAssetOption(order.source_intent.asset) : null;
+  const destinationAssetOption = order ? findAssetOption(order.destination_intent.asset) : null;
+
+  const transactionFees = "";
+
+  const getCurrentStep = (): number => {
+    if (!order) return 0;
+    if (isRedeemed) return 3;
+    if (isDepositDetected) return 2;
+    return 1;
+  };
+
+  const currentStep = getCurrentStep();
 
   const handleOrderClick = (id: string) => {
     router.push(`/order/${id}`);
@@ -951,47 +982,23 @@ export default function OrderDetailsPage() {
       {/* Navigation */}
       <Navbar onOrdersClick={() => setIsOrdersSidebarOpen(true)} />
 
-      {/* PixelBlast Background */}
-      <div className="fixed inset-0 w-full h-full z-0 pointer-events-none">
-        <PixelBlast
-          variant="square"
-          pixelSize={4}
-          color="#B19EEF"
-          patternScale={2}
-          patternDensity={1}
-          pixelSizeJitter={0}
-          enableRipples
-          rippleSpeed={0.5}
-          rippleThickness={0.12}
-          rippleIntensityScale={1.5}
-          liquid
-          liquidStrength={0.12}
-          liquidRadius={1.2}
-          liquidWobbleSpeed={5}
-          speed={0.6}
-          edgeFade={0.25}
-          transparent
+      {/* Prism Background */}
+      <div className="w-screen h-screen absolute inset-0">
+        <Prism
+          animationType="rotate"
+          timeScale={0.5}
+          height={3.5}
+          baseWidth={5.5}
+          scale={3.6}
+          hueShift={0}
+          colorFrequency={1}
+          noise={0.5}
+          glow={1}
         />
       </div>
 
       {/* Main Content */}
       <div className="relative z-10 pt-20 md:pt-24 min-h-screen flex items-center justify-center px-3 xs:px-4 sm:px-6 lg:px-8 py-4 xs:py-6 md:py-12">
-        {/* Back Button */}
-        <motion.button
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          onClick={() => router.push("/swap")}
-          className="fixed top-20 md:top-24 left-4 xs:left-6 sm:left-8 md:left-12 lg:left-16 flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-lg text-gray-300 hover:text-white transition-all cursor-pointer z-40"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm font-medium hidden sm:inline">
-            Back to Swap
-          </span>
-        </motion.button>
-
         {isLoading && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -1024,457 +1031,331 @@ export default function OrderDetailsPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="w-full max-w-2xl"
+            className="w-full max-w-7xl mx-auto px-4"
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="w-full max-w-2xl rounded-3xl bg-white/5 backdrop-blur-lg border border-white/10 p-6 space-y-4 mt-4"
-            >
-              {/* Order Header - From/To Assets */}
-              <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
-                <h1 className="text-lg font-semibold text-white mb-4">
-                  Order Details
-                </h1>
-                <div className="w-full flex items-center justify-between gap-2 md:gap-3">
-                  {/* From Asset */}
-                  {sourceInfo && (
-                    <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-                      <div className="relative flex items-center shrink-0">
-                        {getAssetLogo(sourceInfo.symbol, "lg")}
-                        <div className="absolute -bottom-1 -right-1">
-                          {getChainLogo(sourceInfo.chain, "sm")}
-                        </div>
-                      </div>
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="font-semibold text-white text-base md:text-lg leading-tight truncate">
-                          {sourceInfo.symbol}
-                        </span>
-                        <span className="text-sm font-medium text-gray-300">
+                <div className="flex items-center justify-between mb-4 px-4 lg:max-w-[52vw]">
+                  <p className="text-2xl text-white">
+                    Swap progress...
+                  </p>
+                  <span className="text-2xl" style={{ background: "linear-gradient(99.72deg, #96DD2C -5.97%, #E6EF63 110.07%)",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}>
+                    #{order.order_id.slice(-3)}
+                  </span>
+                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-6">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="space-y-4"
+              >
+
+                <div className="flex items-center justify-between gap-4">
+                  <div className="w-full rounded-3xl p-4 bg-black/35 border border-[#A1A1A1]">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-4xl font-semibold text-white">
                           {formatAmount(
                             order.source_intent.amount,
                             order.source_intent.asset
                           )}
                         </span>
+                        {sourceAssetOption && (
+                          <div className="relative flex items-center shrink-0">
+                            {getAssetLogo(sourceAssetOption.asset.symbol, "md")}
+                            <div className="absolute -bottom-1 -right-1">
+                              {getChainLogo(sourceAssetOption.chainName, "sm")}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
 
-                  {/* Arrow */}
-                  <div className="mx-2 shrink-0">
-                    <svg
-                      className="w-5 h-5 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </div>
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <img
+                          src="/polygon.svg"
+                          alt="Arrow"
+                          className="w-12 h-12"
+                          style={{
+                            filter: "drop-shadow(0 0 20px rgba(201, 255, 128, 0.4))",
+                            transform: "rotate(90deg)",
+                          }}
+                        />
+                        <img
+                          src="/rightarrow.svg"
+                          alt="Right"
+                          className="absolute w-6 h-6"
+                        />
+                      </div>
 
-                  {/* To Asset */}
-                  {destinationInfo && (
-                    <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 justify-end">
-                      <div className="flex flex-col min-w-0 flex-1 items-end">
-                        <span className="font-semibold text-white text-base md:text-lg leading-tight truncate">
-                          {destinationInfo.symbol}
-                        </span>
-                        <span className="text-sm font-medium text-gray-300">
+                    <div className="w-full rounded-3xl p-4 bg-[#161F00]/35 border border-[#A1A1A1]">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-4xl font-semibold text-white">
                           {formatAmount(
                             order.destination_intent.amount,
                             order.destination_intent.asset
                           )}
                         </span>
-                      </div>
-                      <div className="relative flex items-center shrink-0">
-                        {getAssetLogo(destinationInfo.symbol, "lg")}
-                        <div className="absolute -bottom-1 -right-1">
-                          {getChainLogo(destinationInfo.chain, "sm")}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Deposit Address & QR Code - Only show if deposit not detected */}
-              {sourceDepositAddress && !isDepositDetected && (
-                <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
-                  <h2 className="text-base font-semibold text-white mb-3">
-                    Deposit Address
-                  </h2>
-                  <div className="space-y-3">
-                    <div className="bg-white/5 rounded-lg p-3 flex items-center justify-between gap-2">
-                      <p className="text-sm font-mono text-gray-300 break-all flex-1">
-                        {sourceDepositAddress}
-                      </p>
-                      <button
-                        onClick={() =>
-                          copyToClipboard(sourceDepositAddress, "deposit")
-                        }
-                        className="shrink-0 p-2 hover:bg-white/5 rounded-lg transition-colors"
-                        title="Copy address"
-                      >
-                        {copiedAddress === "deposit" ? (
-                          <CheckCircle2 className="w-4 h-4 text-green-400" />
-                        ) : (
-                          <Copy className="w-4 h-4 text-gray-400" />
+                        {destinationAssetOption && (
+                          <div className="relative flex items-center shrink-0">
+                            {getAssetLogo(destinationAssetOption.asset.symbol, "md")}
+                            <div className="absolute -bottom-1 -right-1">
+                              {getChainLogo(destinationAssetOption.chainName, "sm")}
+                            </div>
+                          </div>
                         )}
+                      </div>
+                  </div>
+                </div>
+
+                <div className="p-4 mb-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-base text-white">Transaction fees</span>
+                    <span className="text-base text-white font-medium">{transactionFees}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-base text-white">Order Id</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base text-white font-mono">
+                        {order.order_id.slice(0, 6)}...{order.order_id.slice(-4)}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(order.order_id, "order_id")}
+                        className="p-1 transition-colors"
+                        title="Copy order ID"
+                      >
+                        <Image src="/copy.svg" alt="Copy" width={16} height={16} className="w-4 h-4 invert brightness-200 hover:invert-0 hover:brightness-700 hover:scale-110 transition-transform cursor-pointer" unoptimized />
                       </button>
                     </div>
-                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 p-4 bg-white rounded-lg">
-                      <div className="flex justify-center">
-                        <QRCodeSVG
-                          value={sourceDepositAddress}
-                          size={140}
-                          level="M"
-                          className="w-full max-w-[140px]"
-                        />
-                      </div>
-                      <div className="flex flex-col items-stretch gap-2 w-full md:w-auto">
-                        {isConnected &&
-                          order &&
-                          getRedeemTypeFromAsset(order.source_intent.asset) ===
-                            "evm" && (
-                            <button
-                              onClick={handlePayment}
-                              disabled={isPaying}
-                              className={`px-4 py-2 rounded-lg transition-colors text-white text-sm font-medium ${
-                                isPaying
-                                  ? "bg-purple-600/50 cursor-not-allowed"
-                                  : "bg-purple-600 hover:bg-purple-700"
-                              }`}
-                            >
-                              {isPaying ? (
-                                <span className="inline-flex items-center gap-2">
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  Processing...
-                                </span>
-                              ) : (
-                                "Send Transaction"
-                              )}
-                            </button>
-                          )}
-                        {paymentError && (
-                          <div className="text-xs text-red-400 text-center md:text-left">
-                            {paymentError}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 text-center">
-                      {isConnected
-                        ? "Send transaction directly or scan QR code to send deposit"
-                        : "Scan QR code or copy the address above to send your deposit"}
-                    </p>
                   </div>
-                </div>
-              )}
-
-              {/* Transaction Hash - Show when deposit is detected */}
-              {isDepositDetected && depositTxHash && (
-                <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
-                  <h2 className="text-base font-semibold text-white mb-3">
-                    Deposit Transaction
-                  </h2>
-                  <div className="space-y-3">
-                    <div className="bg-white/5 rounded-lg p-3 flex items-center justify-between gap-2">
-                      <p className="text-sm font-mono text-gray-300 break-all flex-1">
-                        {depositTxHash}
-                      </p>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() =>
-                            copyToClipboard(depositTxHash, "deposit_tx")
-                          }
-                          className="p-2 hover:bg-white/5 rounded-lg transition-colors"
-                          title="Copy transaction hash"
-                        >
-                          {copiedAddress === "deposit_tx" ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-400" />
-                          ) : (
-                            <Copy className="w-4 h-4 text-gray-400" />
-                          )}
-                        </button>
-                        {getExplorerUrl(
-                          order.source_intent.asset,
-                          depositTxHash
-                        ) && (
-                          <a
-                            href={
-                              getExplorerUrl(
-                                order.source_intent.asset,
-                                depositTxHash
-                              ) || "#"
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 hover:bg-white/5 rounded-lg transition-colors"
-                            title="View on explorer"
-                          >
-                            <ExternalLink className="w-4 h-4 text-purple-400" />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-green-400" />
-                      <span className="text-gray-300">
-                        Deposit transaction confirmed
-                      </span>
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-base text-white">Sender address</span>
+                    <button
+                      onClick={() => copyToClipboard(order.source_intent.creator, "sender")}
+                      className="text-base text-white font-mono underline hover:text-[#A2DF35] transition-colors"
+                    >
+                      {order.source_intent.creator.slice(0, 6)}...{order.source_intent.creator.slice(-4)}
+                    </button>
                   </div>
-                </div>
-              )}
-
-              {/* Progress Steps - Vertical */}
-              <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
-                <h2 className="text-base font-semibold text-white mb-4">
-                  Progress
-                </h2>
-                <div className="relative space-y-0">
-                  {/* Step 1: Order Created - Always completed */}
-                  <div className="relative">
-                    <div className="flex items-start gap-3 pb-4">
-                      <div className="shrink-0 mt-0.5 relative z-10">
-                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                          <CheckCircle2 className="w-4 h-4 text-white" />
-                        </div>
-                      </div>
-                      <div className="flex-1 pt-1">
-                        <div className="text-sm font-medium text-green-400">
-                          Order Created
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      className="absolute left-3 w-0.5 bg-green-500"
-                      style={{ top: "1.5rem", height: "1.5rem" }}
-                    />
+                  <div className="flex justify-between items-center">
+                    <span className="text-base text-white">Recipient address</span>
+                    <button
+                      onClick={() => copyToClipboard(order.destination_intent.recipient, "recipient")}
+                      className="text-base text-white font-mono underline hover:text-[#A2DF35] transition-colors"
+                    >
+                      {order.destination_intent.recipient.slice(0, 6)}...{order.destination_intent.recipient.slice(-4)}
+                    </button>
                   </div>
-
-                  {/* Step 2: Awaiting Deposit / Deposit Detected */}
-                  <div className="relative">
-                    <div className="flex items-start gap-3 pb-4">
-                      <div className="shrink-0 mt-0.5 relative z-10">
-                        {isDepositDetected ? (
-                          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                            <CheckCircle2 className="w-4 h-4 text-white" />
-                          </div>
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center">
-                            <Clock className="w-4 h-4 text-white animate-pulse" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 pt-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <div
-                            className={`text-sm font-medium ${
-                              isDepositDetected
-                                ? "text-green-400"
-                                : "text-purple-400"
-                            }`}
-                          >
-                            {isDepositDetected
-                              ? "Deposit Detected"
-                              : "Awaiting Deposit"}
-                          </div>
-                          {isDepositDetected && depositTxHash && (
-                            <button
-                              onClick={() =>
-                                copyToClipboard(depositTxHash, "deposit_tx")
-                              }
-                              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                              title="Copy transaction hash"
-                            >
-                              <span className="font-mono truncate max-w-[100px]">
-                                {depositTxHash.slice(0, 6)}...
-                                {depositTxHash.slice(-4)}
-                              </span>
-                              {copiedAddress === "deposit_tx" ? (
-                                <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
-                              ) : (
-                                <Copy className="w-3 h-3 shrink-0" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        {!isDepositDetected && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            In progress...
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div
-                      className={`absolute left-3 w-0.5 ${
-                        isDepositDetected ? "bg-green-500" : "bg-gray-700"
-                      }`}
-                      style={{ top: "1.5rem", height: "1.5rem" }}
-                    />
-                  </div>
-
-                  {/* Step 3: Awaiting Redeem / Redeemed */}
-                  <div className="relative">
-                    <div className="flex items-start gap-3 pb-4">
-                      <div className="shrink-0 mt-0.5 relative z-10">
-                        {isRedeemed ? (
-                          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                            <CheckCircle2 className="w-4 h-4 text-white" />
-                          </div>
-                        ) : isRefunded ? (
-                          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center">
-                            <CheckCircle2 className="w-4 h-4 text-white" />
-                          </div>
-                        ) : isDepositDetected ? (
-                          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center">
-                            <Clock className="w-4 h-4 text-white animate-pulse" />
-                          </div>
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center">
-                            <div className="w-3 h-3 rounded-full bg-gray-500" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 pt-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <div
-                            className={`text-sm font-medium ${
-                              isRedeemed
-                                ? "text-green-400"
-                                : isRefunded
-                                ? "text-orange-400"
-                                : isDepositDetected
-                                ? "text-purple-400"
-                                : "text-gray-500"
-                            }`}
-                          >
-                            {isRedeemed
-                              ? "Completed"
-                              : isRefunded
-                              ? "Refunded"
-                              : "Awaiting Redeem"}
-                          </div>
-                          {isRedeemed && claimTxHash && (
-                            <button
-                              onClick={() =>
-                                copyToClipboard(claimTxHash, "claim_tx")
-                              }
-                              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                              title="Copy transaction hash"
-                            >
-                              <span className="font-mono truncate max-w-[100px]">
-                                {claimTxHash.slice(0, 6)}...
-                                {claimTxHash.slice(-4)}
-                              </span>
-                              {copiedAddress === "claim_tx" ? (
-                                <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
-                              ) : (
-                                <Copy className="w-3 h-3 shrink-0" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        {!isRedeemed && !isRefunded && isDepositDetected && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            In progress...
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div
-                      className={`absolute left-3 w-0.5 ${
-                        isRedeemed
-                          ? "bg-green-500"
-                          : isRefunded
-                          ? "bg-orange-500"
-                          : isDepositDetected
-                          ? "bg-gray-700"
-                          : "bg-gray-700"
-                      }`}
-                      style={{ top: "1.5rem", height: "1.5rem" }}
-                    />
-                  </div>
-
-                  {/* Step 4: Final Status - Completed or Refunded */}
-                  <div className="relative">
-                    <div className="flex items-start gap-3 pb-4">
-                      <div className="shrink-0 mt-0.5 relative z-10">
-                        {isRedeemed ? (
-                          <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                            <CheckCircle2 className="w-4 h-4 text-white" />
-                          </div>
-                        ) : isRefunded ? (
-                          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center">
-                            <CheckCircle2 className="w-4 h-4 text-white" />
-                          </div>
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center">
-                            <div className="w-3 h-3 rounded-full bg-gray-500" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 pt-1">
-                        <div
-                          className={`text-sm font-medium ${
-                            isRedeemed
-                              ? "text-green-400"
-                              : isRefunded
-                              ? "text-orange-400"
-                              : "text-gray-500"
-                          }`}
-                        >
-                          {isRedeemed
-                            ? "Completed"
-                            : isRefunded
-                            ? "Refunded"
-                            : "Completed / Refunded"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Order Info */}
-              <div className="bg-white/5 backdrop-blur-sm border border-gray-700/40 rounded-[20px] p-4">
-                <h2 className="text-base font-semibold text-white mb-3">
-                  Order Information
-                </h2>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Order ID</span>
-                    <span className="text-gray-300 font-mono text-xs">
-                      {order.order_id}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Created</span>
-                    <span className="text-gray-300">
+                  <div className="flex justify-between items-center">
+                    <span className="text-base text-white">Created at</span>
+                    <span className="text-base text-white">
                       {new Date(order.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Last Updated</span>
-                    <span className="text-gray-300">
-                      {new Date(order.updated_at).toLocaleString()}
-                    </span>
+                </div>
+
+                <div className="w-full rounded-3xl p-6 bg-black/35 border border-[#A1A1A1]">
+                  <h2 className="text-base font-semibold text-[#F1FFDB] mb-4">Order status</h2>
+                  <div className="relative">
+                    <div className="absolute top-6 left-0 right-0 h-0.5">
+                      <div 
+                        className="absolute h-full bg-none"
+                        style={{
+                          left: '12.5%',
+                          right: '12.5%',
+                        }}
+                      />
+                      {currentStep > 0 && (
+                        <motion.div
+                          className="absolute h-full"
+                          initial={{ width: 0 }}
+                          animate={{ 
+                            width: currentStep >= 3 
+                              ? '75%'
+                              : `${(currentStep / 3) * 75}%`
+                          }}
+                          transition={{ duration: 1.5, ease: "easeInOut" }}
+                          style={{
+                            left: '12.5%',
+                            background: "linear-gradient(99.72deg, #96DD2C -5.97%, #E6EF63 110.07%)"
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {currentStep >= 0 && (
+                      <motion.div
+                        className="absolute z-30 flex items-center"
+                        style={{
+                          top: '25px',
+                          transform: 'translate(-50%, -50%)',
+                        }}
+                        initial={{ 
+                          left: '12.5%',
+                          opacity: 0,
+                          scale: 0,
+                        }}
+                        animate={{ 
+                          left: currentStep === 0
+                            ? '12.5%'
+                            : currentStep === 1 
+                            ? '37.5%'
+                            : currentStep === 2 
+                            ? '62.5%'
+                            : '87.5%',
+                          opacity: 1,
+                          scale: 1,
+                        }}
+                        transition={{ 
+                          left: { duration: 1.5, ease: "easeInOut" },
+                          opacity: { duration: 0.3 },
+                          scale: {
+                            type: "spring",
+                            stiffness: 300,
+                            damping: 20,
+                          }
+                        }}
+                      >
+                        <div className="relative -translate-y-1/2">
+                          <div className="relative z-10">
+                            <Image
+                              src="/star.svg"
+                              alt="Active"
+                              width={24}
+                              height={24}
+                              className="w-6 h-6"
+                              unoptimized
+                            />
+                          </div>
+                          <div
+                            className="absolute left-1/2 top-1/2 pointer-events-none"
+                            style={{
+                              width: '45px',
+                              height: '20px',
+                              background: 'linear-gradient(91.58deg, rgba(194, 231, 74, 0) 1.32%, #C2E74A 98.63%)',
+                              opacity: 0.4,
+                              transform: 'translate(-100%, -50%)',
+                              zIndex: 20,
+                            }}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+
+                    <div className="relative flex justify-between items-start">
+                      {[
+                        { label: "Order created", step: 0 },
+                        { label: "Detecting deposit", step: 1 },
+                        { label: "Redeeming", step: 2 },
+                        { label: "Complete", step: 3 },
+                      ].map((stepInfo, index) => {
+                        const isCompleted = currentStep > stepInfo.step || (stepInfo.step === 0 && currentStep >= 0);
+                        const isActive = currentStep === stepInfo.step;
+
+                        return (
+                          <div key={index} className="flex flex-col items-center flex-1">
+                            <div className="relative w-12 h-12 flex items-center justify-center z-20">
+                              {isCompleted && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ 
+                                    duration: 0.5,
+                                    delay: index * 0.2,
+                                    type: "spring",
+                                    stiffness: 200,
+                                    damping: 15
+                                  }}
+                                  className="relative z-10"
+                                >
+                                  <Image
+                                    src="/check_circle.svg"
+                                    alt="Completed"
+                                    width={24}
+                                    height={24}
+                                    className="w-6 h-6"
+                                    unoptimized
+                                  />
+                                </motion.div>
+                              )}
+
+                              {!isCompleted && !isActive && (
+                                <motion.div
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  transition={{ duration: 0.3 }}
+                                  className="w-6 h-6 rounded-full border-2 border-white bg-transparent"
+                                />
+                              )}
+                            </div>
+                            <div className="mt-2 text-center">
+                              <motion.div
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3, delay: index * 0.1 }}
+                                className="text-lg font-medium text-[#F1FFDB]"
+                              >
+                                {stepInfo.label}
+                              </motion.div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="space-y-4"
+              >
+                <div className="bg-white p-6 rounded-3xl">
+                  <h2 className="text-base font-semibold text-black text-center mb-4">
+                    Deposit Address / QR Code
+                  </h2>
+                  <p className="text-sm text-[#B2B1B6] text-center mb-6">
+                    Please deposit to the QR code or address. The system will auto-detect your payment and continue the swap.
+                  </p>
+
+                  <div className="flex justify-center mb-6">
+                    <div className="bg-white p-4 rounded-lg">
+                      <QRCodeSVG
+                        value={sourceDepositAddress}
+                        size={200}
+                        level="M"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl p-4 px-6 flex items-center justify-between gap-2 mb-2"
+                  style={{ background: "linear-gradient(99.72deg, rgba(150, 221, 44, 0.2) -5.97%, rgba(230, 239, 99, 0.2) 110.07%)" }}>
+                    <p className="text-sm font-mono text-black break-all flex-1">
+                      {sourceDepositAddress}
+                    </p>
+                    <button
+                      onClick={() => copyToClipboard(sourceDepositAddress, "deposit")}
+                      className="shrink-0 transition-colors"
+                      title="Copy address"
+                    >
+                      {copiedAddress === "deposit" ? (
+                        <Image src="/check_circle.svg" alt="Copied" width={16} height={16} className="w-4 h-4" unoptimized />
+                      ) : (
+                        <Image src="/copy.svg" alt="Copy" width={16} height={16} className="w-4 h-4 hover:scale-110 transition-transform cursor-pointer" unoptimized />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           </motion.div>
         )}
       </div>
 
-      {/* Orders Sidebar */}
       <OrdersSidebar
         isOpen={isOrdersSidebarOpen}
         onClose={() => setIsOrdersSidebarOpen(false)}

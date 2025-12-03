@@ -35,6 +35,7 @@ const CHAIN_LOGOS: Record<string, string> = {
   Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
   Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
   Zcash: "https://s2.coinmarketcap.com/static/img/coins/64x64/1437.png",
+  Ethereum: "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png",
 };
 
 interface AssetSelectorModalProps {
@@ -53,8 +54,8 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
   else if (key === "wbtc") url = ASSET_LOGOS.wbtc;
   else if (key === "avax") url = ASSET_LOGOS.avax;
   else if (key === "strk") url = ASSET_LOGOS.strk;
-  else if (key === "zec" || key === "zcash") url = ASSET_LOGOS.zec;
-  else if (key === "eth" || key === "ethereum") url = "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png";
+  else if (key === "zcash" || key === "zec") url = ASSET_LOGOS.zec;
+  else if (key === "eth") url = CHAIN_LOGOS.Ethereum;
 
   const sizeClasses = {
     sm: "w-4 h-4",
@@ -227,7 +228,7 @@ export function AssetSelectorModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#070011]/95 backdrop-blur-xl border border-gray-700/40 shadow-xl rounded-2xl max-w-2xl w-full max-h-[80vh] flex flex-col z-50"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#070011]/95 backdrop-blur-xl border border-gray-700/40 shadow-xl rounded-2xl max-w-2xl w-full max-h-[70vh] flex flex-col z-50"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

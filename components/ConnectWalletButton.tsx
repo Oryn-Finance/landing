@@ -225,7 +225,19 @@ export function ConnectWalletButton({
         ) : (
           <motion.button
             onClick={() => setModalOpen(true)}
-            className="px-5 py-2 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-lg text-sm font-medium transition-all cursor-pointer shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+            className="px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer text-black"
+            style={{
+              background: "linear-gradient(to right, #96DD2C, #E6EF63)",
+              boxShadow: "0 0 40px rgba(201, 255, 128, 0.45)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "linear-gradient(to right, #E6EF63, #96DD2C)";
+              e.currentTarget.style.boxShadow = "0 0 55px rgba(201, 255, 128, 0.65)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "linear-gradient(to right, #96DD2C, #E6EF63)";
+              e.currentTarget.style.boxShadow = "0 0 40px rgba(201, 255, 128, 0.45)";
+            }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >

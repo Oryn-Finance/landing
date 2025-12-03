@@ -43,8 +43,8 @@ function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
   else if (key === "wbtc") url = ASSET_LOGOS.wbtc;
   else if (key === "avax") url = ASSET_LOGOS.avax;
   else if (key === "strk") url = ASSET_LOGOS.strk;
-  else if (key === "zec" || key === "zcash") url = ASSET_LOGOS.zec;
-  else if (key === "eth" || key === "ethereum") url = ASSET_LOGOS.ethereum;
+  else if (key === "zcash" || key === "zec") url = ASSET_LOGOS.zec;
+  else if (key === "eth") url = CHAIN_LOGOS.Ethereum;
   const sizeClasses = {
     sm: "w-5 h-5 md:w-6 md:h-6",
     md: "w-8 h-8 md:w-10 md:h-10",
@@ -134,7 +134,7 @@ export const AssetDropdown: React.FC<{
             </>
           ) : (
             <span
-              className="relative inline-block font-medium text-base md:text-lg p-2 md:p-[6px] group/select"
+              className="relative inline-block font-medium text-base md:text-lg  group/select"
               onMouseEnter={(e) => {
                 const gradientText = (
                   e.currentTarget as HTMLElement
@@ -155,38 +155,10 @@ export const AssetDropdown: React.FC<{
               }}
             >
               <span className="relative z-10 text-gray-400">Select asset</span>
-              <span
-                className="absolute inset-0 p-2 md:p-[6px] gradient-text"
-                style={{
-                  clipPath: "polygon(0% 0%, 0% 0%, 0% 0%, 0% 0%)",
-                  transition: "clip-path 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-                  background:
-                    "linear-gradient(to bottom right, #9333ea, #3b82f6, #9333ea)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Select asset
-              </span>
             </span>
           )}
         </div>
-        <svg
-          className={`w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0 ${
-            isOpen ? "rotate-180" : ""
-          }`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        <Image src="/dropdown.svg" alt="Arrow Down" width={12} height={12} className="w-3 h-3 translate-y-[1px] " unoptimized />
       </button>
 
       <AssetSelectorModal
