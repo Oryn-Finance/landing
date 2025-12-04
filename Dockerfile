@@ -10,7 +10,6 @@ RUN apk add --no-cache python3 make g++ && \
 
 # Copy package files first for better caching
 COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn ./.yarn
 
 # Install ALL dependencies (including devDependencies needed for build)
 # DO NOT set NODE_ENV=production here - we need devDeps (TypeScript, Tailwind, etc.)
