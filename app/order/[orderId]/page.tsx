@@ -31,183 +31,13 @@ import {
 import { erc20Abi, type WalletClient } from "viem";
 import { useAssetsStore } from "@/store/assetsStore";
 import Image from "next/image";
-
-const ASSET_LOGOS: Record<string, string> = {
-  wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
-  avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
-  bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  strk: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-};
-
-const CHAIN_LOGOS: Record<string, string> = {
-  "Arbitrum Sepolia":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
-  "Avalanche Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  "Bitcoin Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  "Starknet Sepolia":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-  Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-};
-
-// Explorer URL mapping for different chains
-const EXPLORER_URLS: Record<string, (txHash: string) => string> = {
-  arbitrum_sepolia: (txHash: string) =>
-    `https://sepolia.arbiscan.io/tx/${txHash}`,
-  avalanche_testnet: (txHash: string) =>
-    `https://testnet.snowtrace.io/tx/${txHash}`,
-  ethereum_sepolia: (txHash: string) =>
-    `https://sepolia.etherscan.io/tx/${txHash}`,
-  base_sepolia: (txHash: string) => `https://sepolia.basescan.org/tx/${txHash}`,
-};
-
-function getExplorerUrl(asset: string, txHash: string): string | null {
-  const chainName = asset.split(":")[0];
-  const explorerFn = EXPLORER_URLS[chainName];
-  if (explorerFn) {
-    return explorerFn(txHash);
-  }
-  return null;
-}
-
-const STATUS_STEPS: OrderStatus[] = [
-  "initiated",
-  "awaiting_deposit",
-  "deposit_detected",
-  "awaiting_redeem",
-  "redeeming",
-  "complete",
-];
-
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  initiated: "Initiated",
-  awaiting_deposit: "Awaiting Deposit",
-  deposit_detected: "Deposit Detected",
-  awaiting_redeem: "Awaiting Redeem",
-  redeeming: "Redeeming",
-  complete: "Complete",
-};
-
-function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
-  const key = symbol.toLowerCase();
-  let url: string | undefined;
-  if (key === "btc" || key === "bitcoin") url = ASSET_LOGOS.bitcoin;
-  else if (key === "usdc") url = ASSET_LOGOS.usdc;
-  else if (key === "wbtc") url = ASSET_LOGOS.wbtc;
-  else if (key === "avax") url = ASSET_LOGOS.avax;
-  else if (key === "strk") url = ASSET_LOGOS.strk;
-  else if (key === "zcash" || key === "zec") url = "https://s2.coinmarketcap.com/static/img/coins/64x64/1437.png";
-  else if (key === "eth") url = "https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png";
-
-  const sizeClasses = {
-    sm: "w-5 h-5 md:w-6 md:h-6",
-    md: "w-8 h-8 md:w-10 md:h-10",
-    lg: "w-10 h-10 md:w-14 md:h-14",
-  };
-
-  if (url) {
-    return (
-      <Image
-        src={url.trim()}
-        alt={symbol}
-        className={`${sizeClasses[size]} rounded-full object-contain border border-gray-100 shadow-sm`}
-        style={{ background: "#fff" }}
-        width={80}
-        height={80}
-        unoptimized
-      />
-    );
-  }
-  return (
-    <div
-      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-xs font-semibold uppercase text-gray-400 border`}
-    >
-      {symbol.charAt(0)}
-    </div>
-  );
-}
-
-function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
-  const url = CHAIN_LOGOS[chainName];
-  const sizeClasses = {
-    xs: "w-4 h-4",
-    sm: "w-5 h-5 md:w-6 md:h-6",
-  };
-
-  if (url) {
-    return (
-      <Image
-        src={url.trim()}
-        alt={chainName}
-        className={`${sizeClasses[size]} rounded-full object-contain border-2 border-white shadow-sm`}
-        style={{ background: "#fff" }}
-        width={32}
-        height={32}
-        unoptimized
-      />
-    );
-  }
-  return (
-    <div
-      className={`${sizeClasses[size]} bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-semibold text-gray-500 border-2 border-white`}
-    >
-      {chainName.charAt(0)}
-    </div>
-  );
-}
-
-function getAssetInfo(assetString: string): { chain: string; symbol: string } {
-  const parts = assetString.split(":");
-  if (parts.length >= 2) {
-    const chain = parts[0]
-      .replace("_", " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase());
-    const symbol = parts[1].toUpperCase();
-    return { chain, symbol };
-  }
-  return { chain: "Unknown", symbol: assetString.toUpperCase() };
-}
-
-function getAssetDecimals(assetString: string): number {
-  const parts = assetString.split(":");
-  const symbol = parts[1]?.toLowerCase() || "";
-
-  // Common decimals by symbol
-  const decimalsMap: Record<string, number> = {
-    btc: 8,
-    bitcoin: 8,
-    eth: 18,
-    ethereum: 18,
-    avax: 18,
-    usdc: 6,
-    usdt: 6,
-    wbtc: 8,
-    strk: 18,
-  };
-
-  return decimalsMap[symbol] || 8;
-}
-
-function formatAmount(amount: string, assetString?: string): string {
-  const decimals = assetString ? getAssetDecimals(assetString) : 8;
-  const num = BigInt(amount);
-  const divisor = BigInt(10 ** decimals);
-  const whole = num / divisor;
-  const remainder = num % divisor;
-  if (remainder === BigInt(0)) {
-    return whole.toString();
-  }
-  const decimalStr = remainder.toString().padStart(decimals, "0");
-  let trimmed = decimalStr.replace(/0+$/, "");
-  if (trimmed.length > 4) {
-    trimmed = trimmed.substring(0, 4) + "...";
-  }
-  return `${whole}.${trimmed}`;
-}
+import {
+  getAssetLogo,
+  getChainLogo,
+  getAssetInfo,
+  formatAmount,
+  getExplorerUrl,
+} from "@/utils/assetUtils";
 
 export default function OrderDetailsPage() {
   const params = useParams();
@@ -939,7 +769,6 @@ export default function OrderDetailsPage() {
     : null;
 
   const sourceDepositAddress = order?.source_intent.swap_id || "";
-  console.log(sourceDepositAddress);
 
   // Helper to find AssetOption from asset string
   const findAssetOption = (assetString: string) => {
@@ -1233,7 +1062,7 @@ export default function OrderDetailsPage() {
                             className="absolute left-1/2 top-1/2 pointer-events-none"
                             style={{
                               width: '45px',
-                              height: '20px',
+                              height: '24px',
                               background: 'linear-gradient(91.58deg, rgba(194, 231, 74, 0) 1.32%, #C2E74A 98.63%)',
                               opacity: 0.4,
                               transform: 'translate(-100%, -50%)',
@@ -1332,7 +1161,7 @@ export default function OrderDetailsPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl p-4 px-6 flex items-center justify-between gap-2 mb-2"
+                  <div className="rounded-xl p-4 px-6 flex items-center justify-between gap-2 mb-4"
                   style={{ background: "linear-gradient(99.72deg, rgba(150, 221, 44, 0.2) -5.97%, rgba(230, 239, 99, 0.2) 110.07%)" }}>
                     <p className="text-sm font-mono text-black break-all flex-1">
                       {sourceDepositAddress}
@@ -1349,6 +1178,70 @@ export default function OrderDetailsPage() {
                       )}
                     </button>
                   </div>
+
+                  {isConnected &&
+                    order &&
+                    getRedeemTypeFromAsset(order.source_intent.asset) === "evm" && (
+                      <div className="flex flex-col items-stretch gap-2 w-full">
+                        <button
+                          onClick={handlePayment}
+                          disabled={isPaying}
+                          className={`px-4 py-2.5 rounded-lg transition-all text-sm font-semibold ${
+                            isPaying
+                              ? "cursor-not-allowed opacity-70"
+                              : "cursor-pointer"
+                          }`}
+                          style={
+                            isPaying
+                              ? {
+                                  background: "linear-gradient(to right, rgba(150, 221, 44, 0.5), rgba(230, 239, 99, 0.5))",
+                                  color: "rgba(0, 0, 0, 0.5)",
+                                }
+                              : {
+                                  background: "linear-gradient(to right, #96DD2C, #E6EF63)",
+                                  color: "#000000",
+                                  boxShadow: "0 0 20px rgba(201, 255, 128, 0.4)",
+                                }
+                          }
+                          onMouseEnter={(e) => {
+                            if (!isPaying) {
+                              e.currentTarget.style.background =
+                                "linear-gradient(to right, #E6EF63, #96DD2C)";
+                              e.currentTarget.style.boxShadow =
+                                "0 0 30px rgba(201, 255, 128, 0.6)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isPaying) {
+                              e.currentTarget.style.background =
+                                "linear-gradient(to right, #96DD2C, #E6EF63)";
+                              e.currentTarget.style.boxShadow =
+                                "0 0 20px rgba(201, 255, 128, 0.4)";
+                            }
+                          }}
+                        >
+                          {isPaying ? (
+                            <span className="inline-flex items-center justify-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Processing...
+                            </span>
+                          ) : (
+                            "Send Transaction"
+                          )}
+                        </button>
+                        {paymentError && (
+                          <div className="text-xs text-red-400 text-center">
+                            {paymentError}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  <p className="text-xs text-[#B2B1B6] text-center mt-4">
+                    {isConnected
+                      ? "Send transaction directly or scan QR code to send deposit"
+                      : "Scan QR code or copy the address above to send your deposit"}
+                  </p>
                 </div>
               </motion.div>
             </div>

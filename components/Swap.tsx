@@ -301,7 +301,7 @@ const Swap: React.FC<SwapProps> = () => {
           <div 
             className="w-full rounded-[24px] p-4 bg-black/35 border border-[#A1A1A1]">
             <label className="block text-sm font-medium text-white mb-3">
-              You Give
+              You Send
             </label>
             
             <div className="w-full flex items-center justify-between gap-3 mb-3">
@@ -366,7 +366,7 @@ const Swap: React.FC<SwapProps> = () => {
               </div>
             </div>
 
-            <div className="border-t border-[#A1A1A1] my-3"></div>
+            {fromAsset && <div className="border-t border-[#A1A1A1] my-3"></div>}
 
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-400">
@@ -445,7 +445,7 @@ const Swap: React.FC<SwapProps> = () => {
           <div 
             className="w-full rounded-[24px] p-4 bg-[#161F00]/35 border border-[#A1A1A1]">
             <label className="block text-sm font-medium text-white mb-3">
-              You Get
+              You Receive
             </label>
             
             <div className="w-full flex items-center justify-between gap-3 mb-3">
@@ -486,7 +486,7 @@ const Swap: React.FC<SwapProps> = () => {
               </div>
             </div>
 
-            <div className="border-t border-[#A1A1A1] my-3"></div>
+            {toAsset && <div className="border-t border-[#A1A1A1] my-3"></div>}
 
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-400">

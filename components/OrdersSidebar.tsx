@@ -5,47 +5,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { X, Clock, AlertCircle, ArrowRight, RefreshCw } from "lucide-react";
 import { useAccount } from "wagmi";
-import Image from "next/image";
 import { API_URLS } from "@/constants/constants";
+import {
+  getAssetLogo,
+  getAssetSymbol,
+  formatAmountForDisplay,
+} from "@/utils/assetUtils";
 
 interface OrdersSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onOrderClick?: (orderId: string) => void;
-}
-
-const ASSET_LOGOS: Record<string, string> = {
-  wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
-  avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
-  bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-};
-
-function getAssetLogo(symbol: string) {
-  const key = symbol.toLowerCase();
-  let url: string | undefined;
-  if (key === "btc" || key === "bitcoin") url = ASSET_LOGOS.bitcoin;
-  else if (key === "usdc") url = ASSET_LOGOS.usdc;
-  else if (key === "wbtc") url = ASSET_LOGOS.wbtc;
-  else if (key === "avax") url = ASSET_LOGOS.avax;
-
-  if (url) {
-    return (
-      <Image
-        src={url}
-        alt={symbol}
-        width={20}
-        height={20}
-        className="w-5 h-5 rounded-full object-contain"
-        style={{ background: "#fff" }}
-      />
-    );
-  }
-  return (
-    <div className="w-5 h-5 bg-gray-700 rounded-full flex items-center justify-center text-xs font-medium text-gray-300">
-      {symbol.charAt(0)}
-    </div>
-  );
 }
 
 // Transform API order format to component format
@@ -179,50 +149,6 @@ const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, evmAddress]);
 
-  const getAssetSymbol = (assetValue: string) => {
-    const parts = assetValue.split(":");
-    if (parts.length > 1) {
-      return parts[1].toUpperCase();
-    }
-    return assetValue.toUpperCase();
-  };
-
-  // Get decimals for an asset based on symbol
-  const getAssetDecimals = (assetValue: string): number => {
-    const symbol = getAssetSymbol(assetValue).toLowerCase();
-    // Common token decimals
-    if (symbol === "usdc" || symbol === "usdt") return 6;
-    if (symbol === "wbtc" || symbol === "btc" || symbol === "bitcoin") return 8;
-    if (symbol === "avax" || symbol === "eth") return 18;
-    // Default to 6 for most tokens
-    return 6;
-  };
-
-  const formatAmount = (amount: string | number, assetValue: string = "") => {
-    // Handle both string and number amounts
-    const num = typeof amount === "string" ? parseFloat(amount) : amount;
-
-    // If invalid number, return 0
-    if (isNaN(num) || num === 0) return "0.00";
-
-    // Get appropriate decimals for the asset
-    const decimals = getAssetDecimals(assetValue);
-
-    // Amounts from API are in smallest units, so divide by 10^decimals
-    const humanReadable = num / Math.pow(10, decimals);
-
-    // Format with up to 4 decimal places, but remove trailing zeros
-    // For very small amounts, use more precision
-    if (humanReadable < 0.0001) {
-      return humanReadable.toFixed(6).replace(/\.?0+$/, "");
-    }
-    if (humanReadable < 1) {
-      return humanReadable.toFixed(4).replace(/\.?0+$/, "");
-    }
-
-    // For larger amounts, show 2-4 decimal places
-    return humanReadable.toFixed(4).replace(/\.?0+$/, "") || "0";
-  };
 
   return (
     <AnimatePresence>
@@ -332,8 +258,15 @@ const OrdersSidebar: React.FC<OrdersSidebarProps> = ({
                         </div>
                       </div>
                       <div className="text-sm text-gray-300">
-                        {formatAmount(order.sourceAmount || "0")} →{" "}
-                        {formatAmount(order.destinationAmount || "0")}
+                        {formatAmountForDisplay(
+                          order.sourceAmount || "0",
+                          order.sourceAsset || ""
+                        )}{" "}
+                        →{" "}
+                        {formatAmountForDisplay(
+                          order.destinationAmount || "0",
+                          order.destinationAsset || ""
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
                         {order.createdAt
