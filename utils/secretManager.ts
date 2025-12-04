@@ -1,7 +1,6 @@
 import { sha256 } from "viem";
 import { DigestKey } from "./digestKey";
 import { ECPairFactory } from 'ecpair';
-import * as ecc from 'tiny-secp256k1';
 
 
 // Helper functions
@@ -42,10 +41,16 @@ export const generateSecret = async (nonce: string): Promise<{ secret: `0x${stri
 }
 
 const signMessage = async (nonce: string) => {
+    if (typeof window === "undefined") {
+        throw new Error('signMessage can only be called on the client side');
+    }
+    
     const digestKey = DigestKey.getDigestKey();
     if (!digestKey) {
         throw new Error('No digest key found');
     }
+    
+    const ecc = await import('tiny-secp256k1');
     const ECPair = ECPairFactory(ecc);
 
     const signMessage = 'Avalanche Bridge' + nonce.toString();
@@ -86,4 +91,3 @@ export function getSecret(orderId: string): SecretData | null {
         return null;
     }
 }
-

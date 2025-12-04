@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Wallet, LogOut, Plus } from "lucide-react";
 import { useAccount, useDisconnect, useConnect } from "wagmi";
+import { useStarknetWallet } from "../hooks/useStarknetWallet";
 import { useWalletStore } from "../store/walletStore";
 import { ConnectWalletModal } from "./ConnectWalletModal";
 import Image from "next/image";
@@ -22,6 +23,7 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
   const { address, isConnected, chainId } = useAccount();
   const { disconnect } = useDisconnect();
   const { connectors, connect } = useConnect();
+  const { starknetConnectAsync, starknetAddress, starknetDisconnect } = useStarknetWallet();
   const {
     evmWallet,
     starknetWallet,
@@ -43,6 +45,16 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
     }
   }, [isConnected, address, chainId, setEVMWallet, disconnectEVM]);
 
+  // Sync starknet state with our store
+  useEffect(() => {
+    if (starknetAddress) {
+      setStarknetWallet({
+        address: starknetAddress,
+        isConnected: true,
+      });
+    }
+  }, [starknetAddress, setStarknetWallet]);
+
   const handleEVMConnect = async (connector: any) => {
     setLoadingEVM(true);
     try {
@@ -55,55 +67,12 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
     }
   };
 
-  const handleStarknetConnect = async (wallet: any) => {
+  const handleStarknetConnect = async (connector: any) => {
     setLoadingStarknet(true);
     try {
-      if (typeof window !== "undefined") {
-        if (
-          wallet.id === "argent-x" &&
-          typeof (window as any).starknet !== "undefined"
-        ) {
-          const starknet = (window as any).starknet;
-          if (starknet.isArgentX) {
-            await starknet.enable();
-            if (starknet.account && starknet.account.address) {
-              setStarknetWallet({
-                address: starknet.account.address,
-                isConnected: true,
-              });
-              setModalOpen(false);
-            }
-          }
-        } else if (
-          wallet.id === "braavos" &&
-          typeof (window as any).starknet !== "undefined"
-        ) {
-          const starknet = (window as any).starknet;
-          if (starknet.isBraavos) {
-            await starknet.enable();
-            if (starknet.account && starknet.account.address) {
-              setStarknetWallet({
-                address: starknet.account.address,
-                isConnected: true,
-              });
-              setModalOpen(false);
-            }
-          }
-        } else if (
-          wallet.id === "starknet" &&
-          typeof (window as any).starknet !== "undefined"
-        ) {
-          const starknet = (window as any).starknet;
-          await starknet.enable();
-          if (starknet.account && starknet.account.address) {
-            setStarknetWallet({
-              address: starknet.account.address,
-              isConnected: true,
-            });
-            setModalOpen(false);
-          }
-        }
-      }
+      // Use starknet-react connect
+      await starknetConnectAsync({ connector });
+      setModalOpen(false);
     } catch (error) {
       console.error("Failed to connect Starknet wallet:", error);
     } finally {
@@ -160,8 +129,15 @@ export default function WalletSidebar({ isOpen, onClose }: WalletSidebarProps) {
     }
   };
 
-  const handleDisconnectStarknet = () => {
-    setStarknetWallet({ address: "", isConnected: false });
+  const handleDisconnectStarknet = async () => {
+    try {
+      await starknetDisconnect();
+      setStarknetWallet({ address: "", isConnected: false });
+    } catch (error) {
+      console.error("Error disconnecting Starknet wallet:", error);
+      // Still clear the state even if disconnect fails
+      setStarknetWallet({ address: "", isConnected: false });
+    }
   };
 
   return (

@@ -5,29 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search } from "lucide-react";
 import { useAssetsStore, type AssetOption } from "../store/assetsStore";
-import Image from "next/image";
-
-const ASSET_LOGOS: Record<string, string> = {
-  wbtc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3717.png",
-  avax: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  usdc: "https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png",
-  bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  strk: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-};
-
-const CHAIN_LOGOS: Record<string, string> = {
-  "Arbitrum Sepolia":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/11841.png",
-  "Avalanche Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  "Bitcoin Testnet":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  "Starknet Sepolia":
-    "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-  Avalanche: "https://s2.coinmarketcap.com/static/img/coins/64x64/5805.png",
-  Bitcoin: "https://s2.coinmarketcap.com/static/img/coins/64x64/1.png",
-  Starknet: "https://s2.coinmarketcap.com/static/img/coins/64x64/22691.png",
-};
+import { getAssetLogo, getChainLogo } from "@/utils/assetUtils";
 
 interface AssetSelectorModalProps {
   isOpen: boolean;
@@ -35,70 +13,6 @@ interface AssetSelectorModalProps {
   type: "from" | "to";
   selectedAsset: AssetOption | null;
   onSelect: (asset: AssetOption) => void;
-}
-
-function getAssetLogo(symbol: string, size: "sm" | "md" | "lg" = "md") {
-  const key = symbol.toLowerCase();
-  let url: string | undefined;
-  if (key === "btc" || key === "bitcoin") url = ASSET_LOGOS.bitcoin;
-  else if (key === "usdc") url = ASSET_LOGOS.usdc;
-  else if (key === "wbtc") url = ASSET_LOGOS.wbtc;
-  else if (key === "avax") url = ASSET_LOGOS.avax;
-  else if (key === "strk") url = ASSET_LOGOS.strk;
-
-  const sizeClasses = {
-    sm: "w-4 h-4",
-    md: "w-8 h-8",
-    lg: "w-10 h-10",
-  };
-
-  if (url) {
-    return (
-      <Image
-        src={url.trim()}
-        alt={symbol}
-        className={`${sizeClasses[size]} rounded-full object-contain`}
-        style={{ background: "#fff" }}
-        width={200}
-        height={200}
-      />
-    );
-  }
-  return (
-    <div
-      className={`${sizeClasses[size]} bg-gray-700 rounded-full flex items-center justify-center text-xs font-medium text-gray-300`}
-    >
-      {symbol.charAt(0)}
-    </div>
-  );
-}
-
-function getChainLogo(chainName: string, size: "sm" | "xs" = "sm") {
-  const url = CHAIN_LOGOS[chainName];
-  const sizeClasses = {
-    xs: "w-4 h-4",
-    sm: "w-5 h-5",
-  };
-
-  if (url) {
-    return (
-      <Image
-        src={url.trim()}
-        alt={chainName}
-        className={`${sizeClasses[size]} rounded-full object-contain border-2 border-gray-700`}
-        style={{ background: "#fff" }}
-        width={32}
-        height={32}
-      />
-    );
-  }
-  return (
-    <div
-      className={`${sizeClasses[size]} bg-gray-700 rounded-full flex items-center justify-center text-[10px] font-medium text-gray-300 border-2 border-gray-600`}
-    >
-      {chainName.charAt(0)}
-    </div>
-  );
 }
 
 export function AssetSelectorModal({
@@ -217,7 +131,7 @@ export function AssetSelectorModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#070011]/95 backdrop-blur-xl border border-gray-700/40 shadow-xl rounded-2xl max-w-2xl w-full max-h-[80vh] flex flex-col z-50"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#070011]/95 backdrop-blur-xl border border-gray-700/40 shadow-xl rounded-2xl max-w-2xl w-full max-h-[70vh] flex flex-col z-50"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

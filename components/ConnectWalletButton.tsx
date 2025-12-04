@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useDisconnect, useConnect } from "wagmi";
+import { useStarknetWallet } from "../hooks/useStarknetWallet";
 import { useWalletStore } from "../store/walletStore";
 import { Wallet, Plus, X, User } from "lucide-react";
 import { ConnectWalletModal } from "./ConnectWalletModal";
@@ -24,6 +25,7 @@ export function ConnectWalletButton({
   const { address, isConnected, chainId } = useAccount();
   const { disconnect } = useDisconnect();
   const { connect } = useConnect();
+  const { starknetConnectAsync, starknetAddress, starknetDisconnect } = useStarknetWallet();
   const {
     evmWallet,
     starknetWallet,
@@ -45,6 +47,15 @@ export function ConnectWalletButton({
     }
   }, [isConnected, address, chainId, setEVMWallet, disconnectEVM]);
 
+  useEffect(() => {
+    if (starknetAddress) {
+      setStarknetWallet({
+        address: starknetAddress,
+        isConnected: true,
+      });
+    }
+  }, [starknetAddress, setStarknetWallet]);
+
   const handleEVMConnect = async (connector: any) => {
     setLoadingEVM(true);
     try {
@@ -57,55 +68,12 @@ export function ConnectWalletButton({
     }
   };
 
-  const handleStarknetConnect = async (wallet: any) => {
+  const handleStarknetConnect = async (connector: any) => {
     setLoadingStarknet(true);
     try {
-      if (typeof window !== "undefined") {
-        if (
-          wallet.id === "argent-x" &&
-          typeof (window as any).starknet !== "undefined"
-        ) {
-          const starknet = (window as any).starknet;
-          if (starknet.isArgentX) {
-            await starknet.enable();
-            if (starknet.account && starknet.account.address) {
-              setStarknetWallet({
-                address: starknet.account.address,
-                isConnected: true,
-              });
-              setModalOpen(false);
-            }
-          }
-        } else if (
-          wallet.id === "braavos" &&
-          typeof (window as any).starknet !== "undefined"
-        ) {
-          const starknet = (window as any).starknet;
-          if (starknet.isBraavos) {
-            await starknet.enable();
-            if (starknet.account && starknet.account.address) {
-              setStarknetWallet({
-                address: starknet.account.address,
-                isConnected: true,
-              });
-              setModalOpen(false);
-            }
-          }
-        } else if (
-          wallet.id === "starknet" &&
-          typeof (window as any).starknet !== "undefined"
-        ) {
-          const starknet = (window as any).starknet;
-          await starknet.enable();
-          if (starknet.account && starknet.account.address) {
-            setStarknetWallet({
-              address: starknet.account.address,
-              isConnected: true,
-            });
-            setModalOpen(false);
-          }
-        }
-      }
+      // Use starknet-react connect
+      await starknetConnectAsync({ connector });
+      setModalOpen(false);
     } catch (error) {
       console.error("Failed to connect Starknet wallet:", error);
     } finally {
@@ -127,12 +95,17 @@ export function ConnectWalletButton({
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     if (isConnected) {
       disconnect();
       disconnectEVM();
     }
     if (starknetWallet?.isConnected) {
+      try {
+        await starknetDisconnect();
+      } catch (error) {
+        console.error("Error disconnecting Starknet wallet:", error);
+      }
       setStarknetWallet({ address: "", isConnected: false });
     }
   };
@@ -252,7 +225,19 @@ export function ConnectWalletButton({
         ) : (
           <motion.button
             onClick={() => setModalOpen(true)}
-            className="px-5 py-2 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-lg text-sm font-medium transition-all cursor-pointer shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+            className="px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer text-black"
+            style={{
+              background: "linear-gradient(to right, #96DD2C, #E6EF63)",
+              boxShadow: "0 0 40px rgba(201, 255, 128, 0.45)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "linear-gradient(to right, #E6EF63, #96DD2C)";
+              e.currentTarget.style.boxShadow = "0 0 55px rgba(201, 255, 128, 0.65)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "linear-gradient(to right, #96DD2C, #E6EF63)";
+              e.currentTarget.style.boxShadow = "0 0 40px rgba(201, 255, 128, 0.45)";
+            }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >

@@ -8,10 +8,9 @@ export type SwapIntent = {
   expiry_blocks: number;
   amount: string;
   completed_at: number;
-  deposit_address: string;
   commitment_hash: string;
   commitment: string | null;
-  escrow_address: string;
+  registry_address: string;
   state: string | null;
   transactions: {
     create_tx: string | null;

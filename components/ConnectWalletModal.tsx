@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useConnect } from "wagmi";
-import { X, Zap } from "lucide-react";
+import { useConnect as useStarknetConnect } from "@starknet-react/core";
+import { X, Zap, Wallet } from "lucide-react";
 import Image from "next/image";
 
 interface ConnectWalletModalProps {
@@ -12,17 +13,25 @@ interface ConnectWalletModalProps {
   onClose: () => void;
   onEVMConnect: (connector: any) => void;
   onStarknetConnect: (wallet: any) => void;
+  onZcashConnect?: (address: string) => void;
   loadingEVM: boolean;
   loadingStarknet: boolean;
+  loadingZcash?: boolean;
 }
 
 const WALLET_ICONS: Record<string, string> = {
-  metamask: "https://garden-finance.imgix.net/wallets/metamask.svg",
+  metamask: "https://www.pngall.com/wp-content/uploads/17/Metamask-Financial-Services-Logo-PNG-thumb.png",
   core: "https://build.avax.network/images/core.svg",
-  phantom: "https://garden-finance.imgix.net/wallets/phantomDark.svg",
-  "okx wallet": "https://garden-finance.imgix.net/wallets/okx.svg",
-  "unisat wallet": "https://garden-finance.imgix.net/wallets/unisat.svg",
-  xdefi: "https://garden-finance.imgix.net/wallets/xdefi.svg",
+  keplr: "https://play-lh.googleusercontent.com/q3IAZGlrfKwt-IxX3WWcWJzah56y2RqhESi3Xk8hFarVNnbPtzLSgRDI2JV1681pf2sq5e2lr17ZVD-wzV77IGk",
+  leap: "https://play-lh.googleusercontent.com/0BY-XzNk_6R3DS_oNZfRI-x5L2PDgX8BDo7OL8kPDCKaQi0YzXGrYKWaT2lbOkqqGrs=w240-h480-rw",
+  coinbase: "https://raw.githubusercontent.com/gist/taycaldwell/2291907115c0bb5589bc346661435007/raw/280eafdc84cb80ed0c60e36b4d0c563f6dca6b3e/cbw.svg",
+  rabby: "https://play-lh.googleusercontent.com/voFLXuFxLsIFBHQKmFxUhgAo23RXmO6_esdEb6ebfHQewdMlAfNKq3vAaDh6clJ7Pw",
+  phantom: "https://cdn.prod.website-files.com/6410de4b1ee56e7333393b23/66d87fb4733b331acc81216e_Phantom-Icon_Transparent_Purple.png",
+  "okx wallet": "https://play-lh.googleusercontent.com/N00SbjLJJrhg4hbdnkk3Llk2oedNNgCU29DvR9cpep7Lr0VkzvBkmLqajWNgFb0d7IOO=w240-h480-rw",
+  "unisat wallet": "https://static.images.dropstab.com/images/unisat.png",
+  xdefi: "https://moralis.com/wp-content/uploads/web3wiki/1276-xdefi-wallet/63a46c480b012fc7f5436808_Mb-VXGh_QAeZeuXsT43JUNAYIyh3tn1YeRCfQmVdc08.png",
+  // Zcash wallets
+  unstoppable: "https://play-lh.googleusercontent.com/VQJ7fF4UmjT0WRX0z-LsYLrXGCvMR9OelwUZHHqWXwWzFp0oBrVpLvRhMwqKlY_VGQ=w240-h480",
 };
 
 export function ConnectWalletModal({
@@ -30,11 +39,20 @@ export function ConnectWalletModal({
   onClose,
   onEVMConnect,
   onStarknetConnect,
+  onZcashConnect,
   loadingEVM,
   loadingStarknet,
+  loadingZcash,
 }: ConnectWalletModalProps) {
+  // All hooks must be declared at the top, before any conditional logic
   const { connectors } = useConnect();
-  const [activeTab, setActiveTab] = useState<"evm" | "starknet">("evm");
+  const { connectors: starknetConnectors } = useStarknetConnect();
+  const [activeTab, setActiveTab] = useState<"evm" | "starknet" | "zcash">("evm");
+  const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [bottomSheetHeight, setBottomSheetHeight] = useState("50vh");
+  const [connectingStarknetId, setConnectingStarknetId] = useState<string | null>(null);
+  const [zcashAddress, setZcashAddress] = useState("");
 
   const handleEVMConnect = async (connector: any) => {
     try {
@@ -46,15 +64,29 @@ export function ConnectWalletModal({
 
   const getEVMIcon = (connector: any) => {
     if (!connector?.name) return undefined;
-    const key = connector.name.toLowerCase();
-    return WALLET_ICONS[key];
+    const name = connector.name.toLowerCase();
+    
+    // Direct match
+    if (WALLET_ICONS[name]) {
+      return WALLET_ICONS[name];
+    }
+    
+    // Try to find a partial match (e.g., "Coinbase Wallet" -> "coinbase")
+    const matchingKey = Object.keys(WALLET_ICONS).find(key => 
+      name.includes(key) || key.includes(name)
+    );
+    
+    return matchingKey ? WALLET_ICONS[matchingKey] : undefined;
   };
 
-  const handleStarknetConnect = async (wallet: any) => {
+  const handleStarknetConnect = async (connector: any) => {
+    setConnectingStarknetId(connector.id);
     try {
-      await onStarknetConnect(wallet);
+      await onStarknetConnect(connector);
     } catch (error) {
       console.error("Failed to connect Starknet wallet:", error);
+    } finally {
+      setConnectingStarknetId(null);
     }
   };
 
@@ -63,9 +95,6 @@ export function ConnectWalletModal({
     return WALLET_ICONS[name];
   };
 
-  const [mounted, setMounted] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [bottomSheetHeight, setBottomSheetHeight] = useState("50vh");
 
   useEffect(() => {
     setMounted(true);
@@ -124,37 +153,6 @@ export function ConnectWalletModal({
     }
   };
 
-  if (!open || !mounted) return null;
-
-  // Starknet wallet list
-  const starknetWallets = [
-    {
-      id: "argent-x",
-      name: "Argent X",
-      description: "Connect your Starknet wallet",
-      available:
-        typeof window !== "undefined" &&
-        typeof (window as any).starknet !== "undefined" &&
-        (window as any).starknet?.isArgentX,
-    },
-    {
-      id: "braavos",
-      name: "Braavos",
-      description: "Connect your Starknet wallet",
-      available:
-        typeof window !== "undefined" &&
-        typeof (window as any).starknet !== "undefined" &&
-        (window as any).starknet?.isBraavos,
-    },
-    {
-      id: "starknet",
-      name: "Starknet Wallet",
-      description: "Connect your Starknet wallet",
-      available:
-        typeof window !== "undefined" &&
-        typeof (window as any).starknet !== "undefined",
-    },
-  ];
 
   const modalContent = (
     <AnimatePresence>
@@ -223,22 +221,32 @@ export function ConnectWalletModal({
                 <button
                   className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
                     activeTab === "evm"
-                      ? "bg-purple-500/20 text-purple-300 border-b-2 border-purple-500"
+                      ? "bg-[#7A38EB]/20 text-[#B19EEF] border-b-2 border-[#7A38EB]"
                       : "bg-white/5 text-gray-400 border-b-2 border-transparent hover:bg-white/10 hover:text-gray-300"
                   }`}
                   onClick={() => setActiveTab("evm")}
                 >
-                  EVM Wallets
+                  EVM
                 </button>
                 <button
                   className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
                     activeTab === "starknet"
-                      ? "bg-purple-500/20 text-purple-300 border-b-2 border-purple-500"
+                      ? "bg-[#7A38EB]/20 text-[#B19EEF] border-b-2 border-[#7A38EB]"
                       : "bg-white/5 text-gray-400 border-b-2 border-transparent hover:bg-white/10 hover:text-gray-300"
                   }`}
                   onClick={() => setActiveTab("starknet")}
                 >
-                  Starknet Wallets
+                  Starknet
+                </button>
+                <button
+                  className={`flex-1 py-2 rounded-t-lg font-semibold text-xs md:text-sm transition-colors cursor-pointer ${
+                    activeTab === "zcash"
+                      ? "bg-[#7A38EB]/20 text-[#B19EEF] border-b-2 border-[#7A38EB]"
+                      : "bg-white/5 text-gray-400 border-b-2 border-transparent hover:bg-white/10 hover:text-gray-300"
+                  }`}
+                  onClick={() => setActiveTab("zcash")}
+                >
+                  Zcash
                 </button>
               </div>
             </div>
@@ -249,8 +257,11 @@ export function ConnectWalletModal({
                 {/* EVM Wallets - Only show when EVM tab is active */}
                 {activeTab === "evm" && (
                   <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 md:gap-3">
-                    {connectors.map((connector) => {
+                    {connectors
+                      .filter((connector) => connector.name.toLowerCase() !== "injected")
+                      .map((connector) => {
                       const iconUrl = getEVMIcon(connector);
+                      const hasValidIcon = iconUrl && iconUrl.trim().length > 0;
                       return (
                         <motion.button
                           key={connector.uid}
@@ -259,7 +270,7 @@ export function ConnectWalletModal({
                           className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                            {iconUrl ? (
+                            {hasValidIcon ? (
                               <Image
                                 src={iconUrl}
                                 alt={connector.name}
@@ -284,7 +295,7 @@ export function ConnectWalletModal({
                             </p>
                           </div>
                           {loadingEVM && (
-                            <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-5 h-5 border-2 border-[#7A38EB] border-t-transparent rounded-full animate-spin"></div>
                           )}
                         </motion.button>
                       );
@@ -295,21 +306,26 @@ export function ConnectWalletModal({
                 {/* Starknet Wallets - Only show when Starknet tab is active */}
                 {activeTab === "starknet" && (
                   <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 md:gap-3">
-                    {starknetWallets && starknetWallets.length > 0 ? (
-                      starknetWallets.map((wallet: any, index: number) => {
-                        const iconUrl = getStarknetIcon(wallet.name);
+                    {starknetConnectors && starknetConnectors.length > 0 ? (
+                      starknetConnectors.map((connector: any) => {
+                        const iconUrl = connector.icon 
+                          ? (typeof connector.icon === 'string' ? connector.icon : connector.icon.dark || connector.icon.light)
+                          : undefined;
+                        const hasValidIcon = iconUrl && typeof iconUrl === 'string' && iconUrl.trim().length > 0;
+                        const isConnecting = connectingStarknetId === connector.id;
+                        const isAnyConnecting = connectingStarknetId !== null;
                         return (
                           <motion.button
-                            key={wallet.id || index}
-                            onClick={() => handleStarknetConnect(wallet)}
-                            disabled={loadingStarknet || !wallet.available}
-                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                            key={connector.id}
+                            onClick={() => handleStarknetConnect(connector)}
+                            disabled={isAnyConnecting}
+                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                              {iconUrl ? (
+                              {hasValidIcon ? (
                                 <Image
                                   src={iconUrl}
-                                  alt={wallet.name || "Wallet"}
+                                  alt={connector.name || "Wallet"}
                                   className="w-8 h-8"
                                   width={32}
                                   height={32}
@@ -317,79 +333,21 @@ export function ConnectWalletModal({
                               ) : (
                                 <span className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded">
                                   <span className="text-lg font-bold text-gray-300">
-                                    {(wallet.name || "?")[0]}
+                                    {(connector.name || "?")[0]}
                                   </span>
                                 </span>
                               )}
                             </div>
                             <div className="flex-1 text-left min-w-0">
                               <p className="font-medium text-white text-sm md:text-base truncate">
-                                {wallet.name || "Bitcoin Wallet"}
+                                {connector.name || "Starknet Wallet"}
                               </p>
                               <p className="text-xs md:text-sm text-gray-400 truncate">
-                                {wallet.description ||
-                                  "Connect your Bitcoin wallet"}
+                                Connect your Starknet wallet
                               </p>
                             </div>
-                          </motion.button>
-                        );
-                      })
-                    ) : (
-                      <div className="col-span-2 text-center py-8">
-                        <Zap className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-                        <p className="text-gray-300">
-                          No Bitcoin wallets available
-                        </p>
-                        <p className="text-sm text-gray-400 mt-1">
-                          Make sure you have a Bitcoin wallet extension
-                          installed
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Starknet Wallets - Only show when Starknet tab is active */}
-                {activeTab === "starknet" && (
-                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 md:gap-3">
-                    {starknetWallets && starknetWallets.length > 0 ? (
-                      starknetWallets.map((wallet: any, index: number) => {
-                        const iconUrl = getStarknetIcon(wallet.name);
-                        return (
-                          <motion.button
-                            key={wallet.id || index}
-                            onClick={() => handleStarknetConnect(wallet)}
-                            disabled={loadingStarknet || !wallet.available}
-                            className="w-full flex items-center space-x-2 md:space-x-3 p-3 md:p-4 border border-gray-700/40 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                              {iconUrl ? (
-                                <Image
-                                  src={iconUrl}
-                                  alt={wallet.name || "Wallet"}
-                                  className="w-8 h-8"
-                                  width={32}
-                                  height={32}
-                                />
-                              ) : (
-                                <span className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded">
-                                  <span className="text-lg font-bold text-gray-300">
-                                    {(wallet.name || "?")[0]}
-                                  </span>
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex-1 text-left min-w-0">
-                              <p className="font-medium text-white text-sm md:text-base truncate">
-                                {wallet.name || "Starknet Wallet"}
-                              </p>
-                              <p className="text-xs md:text-sm text-gray-400 truncate">
-                                {wallet.description ||
-                                  "Connect your Starknet wallet"}
-                              </p>
-                            </div>
-                            {loadingStarknet && (
-                              <div className="w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                            {isConnecting && (
+                              <div className="w-5 h-5 border-2 border-[#7A38EB] border-t-transparent rounded-full animate-spin"></div>
                             )}
                           </motion.button>
                         );
@@ -406,6 +364,107 @@ export function ConnectWalletModal({
                         </p>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {activeTab === "zcash" && (
+                  <div className="space-y-4">
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                      <p className="text-sm text-blue-300 mb-2">
+                        <strong>🔐 Privacy-First Cryptocurrency</strong>
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Zcash offers shielded transactions using zero-knowledge proofs. Enter your Zcash address from your wallet to get started.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+                      <motion.a
+                        href="https://unstoppable.money/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-3 p-4 border border-gray-700/40 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                          <Image
+                            src={WALLET_ICONS.unstoppable}
+                            alt="Unstoppable Wallet"
+                            className="w-8 h-8 rounded-lg"
+                            width={32}
+                            height={32}
+                          />
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <p className="font-medium text-white text-sm">
+                            Unstoppable
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Multi-chain + Shielded ZEC
+                          </p>
+                        </div>
+                      </motion.a>
+
+                      <motion.a
+                        href="https://nighthawkwallet.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-3 p-4 border border-gray-700/40 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#7A38EB]/20">
+                          <span className="text-2xl">🦉</span>
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <p className="font-medium text-white text-sm">
+                            Nighthawk
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Privacy-focused Zcash wallet
+                          </p>
+                        </div>
+                      </motion.a>
+                    </div>
+
+                    {/* Manual Address Entry */}
+                    <div className="bg-gray-800/50 border border-gray-700/40 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Wallet className="w-4 h-4 text-[#7A38EB]" />
+                        <p className="text-sm text-gray-300 font-medium">
+                          Enter Your Zcash Address
+                        </p>
+                      </div>
+                      <input
+                        type="text"
+                        value={zcashAddress}
+                        onChange={(e) => setZcashAddress(e.target.value)}
+                        placeholder="t1... (transparent) or z1... (shielded)"
+                        className="w-full px-3 py-2.5 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#7A38EB] mb-3 font-mono"
+                      />
+                      <button
+                        onClick={() => {
+                          if (zcashAddress && onZcashConnect) {
+                            onZcashConnect(zcashAddress);
+                            onClose();
+                          }
+                        }}
+                        disabled={!zcashAddress || loadingZcash}
+                        className="w-full px-4 py-2.5 bg-[#7A38EB] hover:bg-[#9333ea] disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        {loadingZcash ? "Connecting..." : "Connect Address"}
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Copy address from your Zcash wallet
+                      </p>
+                    </div>
+
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                      <p className="text-xs text-yellow-300">
+                        <strong>Note:</strong> WalletConnect for Zcash is not yet supported. Use manual address entry instead.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>

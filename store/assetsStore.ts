@@ -23,6 +23,7 @@ export type AssetOption = {
   chainName: string;
   asset: Asset;
   value: string;
+  tokenAddress?: string;
 };
 
 export type QuoteLeg = {
@@ -130,7 +131,7 @@ export const useAssetsStore = create<AssetsState>()(
           const baseUrl = API_URLS.QUOTE.endsWith("/")
             ? API_URLS.QUOTE.slice(0, -1)
             : API_URLS.QUOTE;
-          const url = `${baseUrl}/chains`;
+          const url = `${baseUrl}/assets`;
 
           const response = await axios.get(url, {
             timeout: 10000,
@@ -139,22 +140,56 @@ export const useAssetsStore = create<AssetsState>()(
             },
           });
 
-          const chains: Chain[] = response.data.result;
+          if (response.data?.result) {
+            // New API structure: flat array of assets
+            const assetsData: Array<{
+              id: string;
+              chainId: string;
+              assetId: string;
+              symbol: string;
+              name: string;
+              decimals: number;
+              tokenAddress: string;
+              cmcId: number;
+            }> = response.data.result;
 
-          const flatOptions: AssetOption[] = [];
-          chains.forEach((chain) => {
-            chain.assets.forEach((asset) => {
-              flatOptions.push({
-                chainId: chain.id,
-                chainName: chain.name,
-                asset,
-                value: `${chain.id}:${asset.symbol}`,
-              });
-            });
-          });
-          set({ assets: flatOptions, isLoading: false });
+            const chainNameMap: Record<string, string> = {
+              avalanche_testnet: "Avalanche Testnet",
+              arbitrum_sepolia: "Arbitrum Sepolia",
+              base_sepolia: "Base Sepolia",
+              zcash_testnet: "Zcash Testnet",
+              starknet_sepolia: "Starknet Sepolia",
+            };
+
+            const flatOptions: AssetOption[] = assetsData.map((item) => ({
+              chainId: item.chainId,
+              chainName: chainNameMap[item.chainId] || item.chainId,
+              asset: {
+                symbol: item.symbol,
+                name: item.name,
+                decimals: item.decimals,
+                cmcId: item.cmcId,
+              },
+              value: `${item.chainId}:${item.symbol.toLowerCase()}`,
+              tokenAddress: item.tokenAddress,
+            }));
+
+            set({ assets: flatOptions, isLoading: false });
+          } else {
+            throw new Error("Invalid response format");
+          }
         } catch (error) {
-          console.error("Failed to fetch assets:", error);
+          if (axios.isAxiosError(error)) {
+            if (error.code === "ECONNABORTED") {
+              console.warn("Assets API request timed out, using demo assets");
+            } else if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+              console.warn("Assets API is not reachable. Using demo assets (API server may not be running).");
+            } else {
+              console.warn("Failed to fetch assets:", error.message);
+            }
+          } else {
+            console.warn("Failed to fetch assets:", error);
+          }
 
           const mockAssets: AssetOption[] = [
             {
@@ -590,6 +625,20 @@ export const useAssetsStore = create<AssetsState>()(
             },
           });
 
+          // Handle new response structure: { status: "Ok", result: { order_id, source_intent, destination_intent, ... } }
+          if (response?.data?.status === "Ok" && response?.data?.result) {
+            const orderId = response.data.result.order_id;
+            if (orderId && commitmentHash?.secret) {
+              localStorage.setItem(
+                `order_secret_${orderId}`,
+                JSON.stringify({ secret: commitmentHash.secret })
+              );
+            }
+            set({ isLoading: false });
+            return response.data;
+          }
+          
+          // Fallback for old response structure
           if (response?.data?.order_id && commitmentHash?.secret) {
             const orderId = response.data.order_id;
             localStorage.setItem(
